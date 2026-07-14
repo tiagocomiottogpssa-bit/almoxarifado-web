@@ -1426,6 +1426,90 @@ def exportar_unidades():
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
+@app.route('/unidades/transferir', methods=['POST'])
+@jwt_required()
+def transferir_unidades_lote():
+    data = request.get_json() or {}
+    unidades_ids = data.get('unidades_ids', [])
+    destino_id = data.get('destino_id')
+
+    if not unidades_ids:
+        return response(False, message='Selecione ao menos uma unidade.', status_code=400)
+    if not destino_id:
+        return response(False, message='destino_id é obrigatório.', status_code=400)
+
+    try:
+        with get_connection() as conn:
+            destino = conn.execute('SELECT nome FROM almoxarifados WHERE id = ?', (destino_id,)).fetchone()
+            if not destino:
+                return response(False, message='Almoxarifado de destino não encontrado.', status_code=404)
+
+            transferidas = 0
+            erros = []
+            doc_transf = f"Transferência Lote {now_iso()[:19]}"
+
+            for uid in unidades_ids:
+                row = conn.execute(
+                    'SELECT tag, produto_id, almoxarifado_id FROM unidades WHERE id = ?', (uid,)
+                ).fetchone()
+                if not row:
+                    erros.append(f'Unidade ID {uid} não encontrada.')
+                    continue
+                if row['almoxarifado_id'] == destino_id:
+                    erros.append(f'Unidade TAG {row["tag"]} já está no destino.')
+                    continue
+
+                produto_id = row['produto_id']
+                origem_id = row['almoxarifado_id']
+                tag = row['tag'] or 'sem tag'
+
+                # Atualiza almoxarifado da unidade
+                conn.execute(
+                    'UPDATE unidades SET almoxarifado_id = ?, updated_at = ? WHERE id = ?',
+                    (destino_id, now_iso(), uid)
+                )
+
+                # Decrementa estoque da origem
+                if origem_id:
+                    conn.execute(
+                        '''UPDATE estoque SET quantidade = quantidade - 1, updated_at = ?
+                           WHERE produto_id = ? AND almoxarifado_id = ?''',
+                        (now_iso(), produto_id, origem_id)
+                    )
+                    conn.execute('''
+                        INSERT INTO movimentacoes (produto_id, almoxarifado_id, tipo, quantidade, valor_unitario, documento, observacao)
+                        VALUES (?, ?, 'saida', 1, 0, ?, ?)
+                    ''', (produto_id, origem_id, doc_transf, f'Saída - Transferência em lote - TAG {tag}'))
+
+                # Incrementa estoque do destino
+                conn.execute(
+                    '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, updated_at)
+                       VALUES (?, ?, 1, ?)
+                       ON CONFLICT(produto_id, almoxarifado_id)
+                       DO UPDATE SET quantidade = estoque.quantidade + 1, updated_at = excluded.updated_at''',
+                    (produto_id, destino_id, now_iso())
+                )
+                conn.execute('''
+                    INSERT INTO movimentacoes (produto_id, almoxarifado_id, tipo, quantidade, valor_unitario, documento, observacao)
+                    VALUES (?, ?, 'entrada', 1, 0, ?, ?)
+                ''', (produto_id, destino_id, doc_transf, f'Entrada - Transferência em lote - TAG {tag}'))
+
+                transferidas += 1
+
+            conn.commit()
+            current_user = get_jwt_identity()
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            if user:
+                registrar_log(user['id'], current_user, 'transferencia_lote', 'unidades',
+                              f'Transferiu {transferidas} unidade(s) para "{destino["nome"]}"')
+
+            msg = f'{transferidas} unidade(s) transferida(s).'
+            if erros:
+                msg += f' {len(erros)} erro(s): ' + '; '.join(erros)
+            return response(True, message=msg)
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
 @app.route('/unidades/importar', methods=['POST'])
 @jwt_required()
 def importar_unidades():

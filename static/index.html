@@ -591,12 +591,13 @@ th, td {
                 </div>
             </form>
 
-            <div style="display: flex; gap: 10px; margin-bottom: 16px; justify-content: flex-end;">
-                <button type="button" class="btn-success" onclick="exportarUnidades()" style="min-width: 140px;">
-                    ⬇️ Exportar Excel
-                </button>
-                <label class="btn-import" style="cursor: pointer; display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; background: #6366f1; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 500;">
-                    📥 Importar Excel
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; justify-content: flex-end;">
+                <button type="button" class="btn-success" onclick="abrirModalRetornoManutencaoLote()" style="background: #10b981; padding: 6px 14px; font-size: 13px; white-space: nowrap;">✅ Retorno</button>
+                <button type="button" class="btn-success" onclick="abrirModalManutencaoLote()" style="background: #f59e0b; padding: 6px 14px; font-size: 13px; white-space: nowrap;">🔧 Manutenção</button>
+                <button type="button" class="btn-success" onclick="abrirModalTransferenciaUnidades()" style="background: #8b5cf6; padding: 6px 14px; font-size: 13px; white-space: nowrap;">🔄 Transferir</button>
+                <button type="button" class="btn-success" onclick="exportarUnidades()" style="padding: 6px 14px; font-size: 13px; white-space: nowrap;">⬇️ Exportar</button>
+                <label class="btn-import" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: #6366f1; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; white-space: nowrap;">
+                    📥 Importar
                     <input type="file" accept=".xlsx,.xls" style="display: none;" onchange="importarUnidades(this)">
                 </label>
             </div>
@@ -1548,84 +1549,6 @@ function importarProdutos(input) {
     reader.readAsArrayBuffer(file);
 }
 
-// ========== EXPORTAR / IMPORTAR UNIDADES ==========
-function exportarUnidades() {
-    fetch(`${API_BASE}/unidades`)
-        .then(res => res.json())
-        .then(unidades => {
-            if (!unidades.length) {
-                alert('Nenhuma unidade cadastrada para exportar.');
-                return;
-            }
-
-            const headers = ['Produto', 'TAG', 'Nº Série', 'Status'];
-
-            const linhas = unidades.map(u => [
-                u.produto_nome || u.produto_id || '',
-                u.tag || '',
-                u.numero_serie || '',
-                u.status || ''
-            ]);
-
-            const csv = [headers.join(';'), ...linhas.map(l => l.join(';'))].join('\n');
-            downloadCSV(csv, 'unidades.csv');
-        })
-        .catch(err => {
-            alert('Erro ao exportar unidades.');
-            console.error(err);
-        });
-}
-
-function importarUnidades(input) {
-    const file = input.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json(sheet);
-
-            if (!json.length) {
-                alert('Planilha vazia.');
-                input.value = '';
-                return;
-            }
-
-            const unidades = json.map(row => ({
-                produto_nome: row['Produto'] || row['produto'] || '',
-                tag: row['TAG'] || row['tag'] || '',
-                numero_serie: row['Nº Série'] || row['numero_serie'] || row['n_serie'] || '',
-                status: row['Status'] || row['status'] || 'disponivel'
-            }));
-
-            fetch(`${API_BASE}/unidades/importar`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ unidades })
-            })
-            .then(res => res.json())
-            .then(result => {
-                alert(`${result.importados || 0} unidades importadas com sucesso!`);
-                input.value = '';
-                if (typeof carregarUnidades === 'function') carregarUnidades();
-            })
-            .catch(err => {
-                alert('Erro ao importar unidades.');
-                console.error(err);
-            });
-
-        } catch (err) {
-            alert('Erro ao ler planilha. Verifique o formato.');
-            console.error(err);
-            input.value = '';
-        }
-    };
-    reader.readAsArrayBuffer(file);
-}
-
 // ========== UTILITÁRIO ==========
 function downloadCSV(csv, filename) {
     const BOM = '\uFEFF';
@@ -1671,12 +1594,12 @@ async function carregarDashboard() {
         const colMap = {};
         (colaboradores.data || colaboradores).forEach(c => colMap[c.id] = c);
 
-        // 4. Busca equipamentos (endpoint a definir)
+        // 4. Busca unidades (substitui o antigo /equipamentos)
         let equipamentos = [];
         try {
-            const resEq = await fetch(`${API_BASE}/equipamentos`, { headers });
+            const resEq = await fetch(`${API_BASE}/unidades`, { headers });
             equipamentos = await resEq.json();
-        } catch(e) { /* endpoint pode não existir ainda */ }
+        } catch(e) { /* fallback silencioso */ }
 
         // Filtra por período
         const movFiltradas = (movimentacoes.data || movimentacoes).filter(m => {
@@ -1709,7 +1632,7 @@ async function carregarDashboard() {
         document.getElementById('dash-card-estoque').textContent = estoqueCritico;
 
         // ===== CARD: Equipamentos em Manutenção =====
-        const emManutencao = (equipamentos.data || equipamentos || []).filter(e => e.status === 'manutencao' || e.status === 'em_manutencao');
+        const emManutencao = (equipamentos.data || equipamentos || []).filter(e => e.status_manutencao === 'em_manutencao');
         document.getElementById('dash-card-manutencao').textContent = emManutencao.length;
 
         // ===== CARD: Calibrações a Vencer =====
@@ -4429,8 +4352,327 @@ function cancelarEdicaoPedido() {
     document.getElementById('btnCancelarEdicao').style.display = 'none';
 }
 
+// ===== TRANSFERÊNCIA DE UNIDADES EM LOTE =====
+let unidadesTransferenciaCache = [];
+
+async function abrirModalTransferenciaUnidades() {
+    document.getElementById('modal-transferencia-unidades').style.display = 'flex';
+    await carregarSelectsTransferencia();
+}
+function fecharModalTransferenciaUnidades() {
+    document.getElementById('modal-transferencia-unidades').style.display = 'none';
+    document.getElementById('transf_unid_origem').value = '';
+    document.getElementById('transf_unid_destino').value = '';
+    document.getElementById('transf_unid_filtro').value = '';
+    document.getElementById('transf_unid_lista').innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado de origem.</div>';
+    document.getElementById('transf_unid_contador').textContent = '0 selecionada(s)';
+    document.getElementById('transf_unid_mensagem').innerHTML = '';
+    unidadesTransferenciaCache = [];
+}
+async function carregarSelectsTransferencia() {
+    const token = localStorage.getItem('access_token');
+    try {
+        const res = await fetch(`${API_BASE}/almoxarifados`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        const almoxarifados = data.data || data || [];
+        const origem = document.getElementById('transf_unid_origem');
+        const destino = document.getElementById('transf_unid_destino');
+        origem.innerHTML = '<option value="">Selecione a origem</option>';
+        destino.innerHTML = '<option value="">Selecione o destino</option>';
+        almoxarifados.forEach(a => {
+            origem.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+            destino.innerHTML += `<option value="${a.id}">${a.nome}</option>`;
+        });
+    } catch (err) { console.error('Erro:', err); }
+}
+async function carregarUnidadesTransferencia() {
+    const origemId = document.getElementById('transf_unid_origem').value;
+    const listaDiv = document.getElementById('transf_unid_lista');
+    unidadesTransferenciaCache = [];
+    if (!origemId) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione a origem.</div>'; atualizarContadorTransferencia(); return; }
+    const token = localStorage.getItem('access_token');
+    try {
+        const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        const todas = data.data || data || [];
+        unidadesTransferenciaCache = todas.filter(u => String(u.almoxarifado_id) === String(origemId) && u.status_manutencao !== 'em_manutencao');
+        renderizarListaTransferencia();
+    } catch (err) { listaDiv.innerHTML = '<div style="text-align: center; color: #ef4444; padding: 24px;">Erro ao carregar.</div>'; }
+}
+function renderizarListaTransferencia() {
+    const listaDiv = document.getElementById('transf_unid_lista');
+    const filtro = (document.getElementById('transf_unid_filtro').value || '').toLowerCase();
+    const filtradas = unidadesTransferenciaCache.filter(u => {
+        if (!filtro) return true;
+        return (u.tag || '').toLowerCase().includes(filtro) || (u.produto_nome || '').toLowerCase().includes(filtro) || (u.numero_serie || '').toLowerCase().includes(filtro);
+    });
+    if (filtradas.length === 0) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Nenhuma unidade disponível.</div>'; atualizarContadorTransferencia(); return; }
+    listaDiv.innerHTML = filtradas.map(u => `
+        <label style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer;">
+            <input type="checkbox" class="transf-unid-check" value="${u.id}" onchange="atualizarContadorTransferencia()">
+            <div style="flex: 1;"><div style="font-weight: 600; font-size: 14px;">${u.tag || 'Sem TAG'}</div><div style="font-size: 12px; color: #6b7280;">${u.produto_nome || '—'} • Série: ${u.numero_serie || '—'}</div></div>
+        </label>`).join('');
+    atualizarContadorTransferencia();
+}
+function filtrarUnidadesTransferencia() { renderizarListaTransferencia(); }
+function toggleSelecionarTodosTransferencia() { const m = document.getElementById('transf_unid_selecionar_todos'); document.querySelectorAll('.transf-unid-check').forEach(c => c.checked = m.checked); atualizarContadorTransferencia(); }
+function atualizarContadorTransferencia() { document.getElementById('transf_unid_contador').textContent = `${document.querySelectorAll('.transf-unid-check:checked').length} selecionada(s)`; }
+async function confirmarTransferenciaUnidades() {
+    const destinoId = document.getElementById('transf_unid_destino').value;
+    const ids = Array.from(document.querySelectorAll('.transf-unid-check:checked')).map(c => parseInt(c.value));
+    const msgDiv = document.getElementById('transf_unid_mensagem');
+    if (!destinoId) { msgDiv.innerHTML = '<div style="color: #ef4444; font-size: 13px;">Selecione o destino.</div>'; return; }
+    if (ids.length === 0) { msgDiv.innerHTML = '<div style="color: #ef4444; font-size: 13px;">Selecione ao menos uma unidade.</div>'; return; }
+    const token = localStorage.getItem('access_token');
+    msgDiv.innerHTML = '<div style="color: #6b7280; font-size: 13px;">Transferindo...</div>';
+    try {
+        const res = await fetch(`${API_BASE}/unidades/transferir`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ unidades_ids: ids, destino_id: parseInt(destinoId) }) });
+        const data = await res.json();
+        if (res.ok && data.success !== false) { msgDiv.innerHTML = `<div style="color: #16a34a; font-size: 13px; font-weight: 600;">✅ ${data.message}</div>`; setTimeout(() => { carregarUnidadesTransferencia(); loadUnidades(); }, 1500); }
+        else { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${data.message || 'Erro.'}</div>`; }
+    } catch (err) { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${err.message}</div>`; }
+}
+
+// ===== MANUTENÇÃO EM LOTE =====
+let unidadesManutencaoCache = [];
+function abrirModalManutencaoLote() { document.getElementById('modal-manutencao-lote').style.display = 'flex'; carregarSelectManutencaoLote(); }
+function fecharModalManutencaoLote() {
+    document.getElementById('modal-manutencao-lote').style.display = 'none';
+    document.getElementById('manut_lote_almoxarifado').value = '';
+    document.getElementById('manut_lote_descricao').value = '';
+    document.getElementById('manut_lote_fornecedor').value = '';
+    document.getElementById('manut_lote_filtro').value = '';
+    document.getElementById('manut_lote_lista').innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado.</div>';
+    document.getElementById('manut_lote_contador').textContent = '0 selecionada(s)';
+    document.getElementById('manut_lote_mensagem').innerHTML = '';
+    unidadesManutencaoCache = [];
+}
+async function carregarSelectManutencaoLote() {
+    const token = localStorage.getItem('access_token');
+    try { const res = await fetch(`${API_BASE}/almoxarifados`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const a = data.data || data || []; const s = document.getElementById('manut_lote_almoxarifado'); s.innerHTML = '<option value="">Selecione</option>'; a.forEach(x => s.innerHTML += `<option value="${x.id}">${x.nome}</option>`); } catch(e) { console.error(e); }
+}
+async function carregarUnidadesManutencaoLote() {
+    const almoxId = document.getElementById('manut_lote_almoxarifado').value;
+    const listaDiv = document.getElementById('manut_lote_lista');
+    unidadesManutencaoCache = [];
+    if (!almoxId) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado.</div>'; atualizarContadorManutencao(); return; }
+    const token = localStorage.getItem('access_token');
+    try { const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const t = data.data || data || []; unidadesManutencaoCache = t.filter(u => String(u.almoxarifado_id) === String(almoxId) && u.status_manutencao !== 'em_manutencao'); renderizarListaManutencao(); } catch(e) { listaDiv.innerHTML = '<div style="color: #ef4444; padding: 24px;">Erro.</div>'; }
+}
+function renderizarListaManutencao() {
+    const listaDiv = document.getElementById('manut_lote_lista');
+    const f = (document.getElementById('manut_lote_filtro').value || '').toLowerCase();
+    const filtradas = unidadesManutencaoCache.filter(u => { if (!f) return true; return (u.tag||'').toLowerCase().includes(f) || (u.produto_nome||'').toLowerCase().includes(f) || (u.numero_serie||'').toLowerCase().includes(f); });
+    if (filtradas.length === 0) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Nenhuma unidade disponível.</div>'; atualizarContadorManutencao(); return; }
+    listaDiv.innerHTML = filtradas.map(u => `<label style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer;"><input type="checkbox" class="manut-lote-check" value="${u.id}" onchange="atualizarContadorManutencao()"><div style="flex: 1;"><div style="font-weight: 600; font-size: 14px;">${u.tag||'Sem TAG'}</div><div style="font-size: 12px; color: #6b7280;">${u.produto_nome||'—'} • Série: ${u.numero_serie||'—'}</div></div><span style="font-size: 11px; padding: 3px 8px; border-radius: 8px; background: #dcfce7; color: #166534;">disponivel</span></label>`).join('');
+    atualizarContadorManutencao();
+}
+function filtrarUnidadesManutencaoLote() { renderizarListaManutencao(); }
+function toggleSelecionarTodosManutencao() { const m = document.getElementById('manut_lote_selecionar_todos'); document.querySelectorAll('.manut-lote-check').forEach(c => c.checked = m.checked); atualizarContadorManutencao(); }
+function atualizarContadorManutencao() { document.getElementById('manut_lote_contador').textContent = `${document.querySelectorAll('.manut-lote-check:checked').length} selecionada(s)`; }
+async function confirmarManutencaoLote() {
+    const descricao = document.getElementById('manut_lote_descricao').value.trim();
+    const fornecedor = document.getElementById('manut_lote_fornecedor').value.trim();
+    const ids = Array.from(document.querySelectorAll('.manut-lote-check:checked')).map(c => parseInt(c.value));
+    const msgDiv = document.getElementById('manut_lote_mensagem');
+    if (!descricao) { msgDiv.innerHTML = '<div style="color: #ef4444; font-size: 13px;">Descrição é obrigatória.</div>'; return; }
+    if (ids.length === 0) { msgDiv.innerHTML = '<div style="color: #ef4444; font-size: 13px;">Selecione ao menos uma unidade.</div>'; return; }
+    const token = localStorage.getItem('access_token');
+    msgDiv.innerHTML = '<div style="color: #6b7280; font-size: 13px;">Enviando...</div>';
+    try {
+        const res = await fetch(`${API_BASE}/unidades/manutencao/lote`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ descricao, fornecedor: fornecedor || null, unidades_ids: ids }) });
+        const data = await res.json();
+        if (res.ok && data.success !== false) { msgDiv.innerHTML = `<div style="color: #16a34a; font-size: 13px; font-weight: 600;">✅ ${data.message}</div>`; setTimeout(() => { carregarUnidadesManutencaoLote(); loadUnidades(); }, 1500); }
+        else { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${data.message||'Erro.'}</div>`; }
+    } catch(e) { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${e.message}</div>`; }
+}
+
+// ===== RETORNO DE MANUTENÇÃO EM LOTE =====
+let unidadesRetornoCache = [];
+async function abrirModalRetornoManutencaoLote() { document.getElementById('modal-retorno-manutencao-lote').style.display = 'flex'; await carregarSelectsRetornoLote(); await carregarUnidadesRetornoLote(); }
+function fecharModalRetornoManutencaoLote() { document.getElementById('modal-retorno-manutencao-lote').style.display = 'none'; document.getElementById('retorno_lote_destino').value = ''; document.getElementById('retorno_lote_custo').value = ''; document.getElementById('retorno_lote_filtro').value = ''; document.getElementById('retorno_lote_mensagem').innerHTML = ''; unidadesRetornoCache = []; }
+async function carregarSelectsRetornoLote() {
+    const token = localStorage.getItem('access_token');
+    try { const res = await fetch(`${API_BASE}/almoxarifados`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const a = data.data || data || []; const s = document.getElementById('retorno_lote_destino'); s.innerHTML = '<option value="">Selecione o destino</option>'; a.forEach(x => s.innerHTML += `<option value="${x.id}">${x.nome}</option>`); } catch(e) { console.error(e); }
+}
+async function carregarUnidadesRetornoLote() {
+    const token = localStorage.getItem('access_token');
+    const listaDiv = document.getElementById('retorno_lote_lista');
+    try { const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const t = data.data || data || []; unidadesRetornoCache = t.filter(u => u.status_manutencao === 'em_manutencao'); renderizarListaRetorno(); } catch(e) { listaDiv.innerHTML = '<div style="color: #ef4444; padding: 24px;">Erro.</div>'; }
+}
+function renderizarListaRetorno() {
+    const listaDiv = document.getElementById('retorno_lote_lista');
+    const f = (document.getElementById('retorno_lote_filtro').value || '').toLowerCase();
+    const filtradas = unidadesRetornoCache.filter(u => { if (!f) return true; return (u.tag||'').toLowerCase().includes(f) || (u.produto_nome||'').toLowerCase().includes(f) || (u.numero_serie||'').toLowerCase().includes(f); });
+    if (filtradas.length === 0) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Nenhuma unidade em manutenção.</div>'; atualizarContadorRetorno(); return; }
+    listaDiv.innerHTML = filtradas.map(u => `<label style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer;"><input type="checkbox" class="retorno-lote-check" value="${u.id}" onchange="atualizarContadorRetorno()"><div style="flex: 1;"><div style="font-weight: 600; font-size: 14px;">${u.tag||'Sem TAG'}</div><div style="font-size: 12px; color: #6b7280;">${u.produto_nome||'—'} • Série: ${u.numero_serie||'—'}</div></div><span style="font-size: 11px; padding: 3px 8px; border-radius: 8px; background: #fef3c7; color: #92400e;">em_manutencao</span></label>`).join('');
+    atualizarContadorRetorno();
+}
+function filtrarUnidadesRetornoLote() { renderizarListaRetorno(); }
+function toggleSelecionarTodosRetorno() { const m = document.getElementById('retorno_lote_selecionar_todos'); document.querySelectorAll('.retorno-lote-check').forEach(c => c.checked = m.checked); atualizarContadorRetorno(); }
+function atualizarContadorRetorno() { document.getElementById('retorno_lote_contador').textContent = `${document.querySelectorAll('.retorno-lote-check:checked').length} selecionada(s)`; }
+async function confirmarRetornoManutencaoLote() {
+    const destinoId = document.getElementById('retorno_lote_destino').value;
+    const custo = document.getElementById('retorno_lote_custo').value;
+    const ids = Array.from(document.querySelectorAll('.retorno-lote-check:checked')).map(c => parseInt(c.value));
+    const msgDiv = document.getElementById('retorno_lote_mensagem');
+    if (!destinoId) { msgDiv.innerHTML = '<div style="color: #ef4444; font-size: 13px;">Selecione o destino.</div>'; return; }
+    if (ids.length === 0) { msgDiv.innerHTML = '<div style="color: #ef4444; font-size: 13px;">Selecione ao menos uma unidade.</div>'; return; }
+    const token = localStorage.getItem('access_token');
+    msgDiv.innerHTML = '<div style="color: #6b7280; font-size: 13px;">Processando...</div>';
+    const body = { destino_id: parseInt(destinoId), unidades_ids: ids };
+    if (custo) body.custo = parseFloat(custo);
+    try {
+        const res = await fetch(`${API_BASE}/unidades/manutencao/retorno/lote`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (res.ok && data.success !== false) { msgDiv.innerHTML = `<div style="color: #16a34a; font-size: 13px; font-weight: 600;">✅ ${data.message}</div>`; setTimeout(() => { carregarUnidadesRetornoLote(); loadUnidades(); }, 1500); }
+        else { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${data.message||'Erro.'}</div>`; }
+    } catch(e) { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${e.message}</div>`; }
+}
+
 window.addEventListener('load', init);
 </script>
+
+<!-- ===== MODAL: Transferência de Unidades em Lote ===== -->
+<div id="modal-transferencia-unidades" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 28px; width: 90%; max-width: 750px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-size: 20px; color: #374151;">🔄 Transferência de Unidades em Lote</h2>
+            <button type="button" onclick="fecharModalTransferenciaUnidades()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #9ca3af;">&times;</button>
+        </div>
+        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <div class="form-group" style="flex: 1;">
+                <label>Almoxarifado de Origem</label>
+                <select id="transf_unid_origem" onchange="carregarUnidadesTransferencia()">
+                    <option value="">Selecione a origem</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Almoxarifado de Destino *</label>
+                <select id="transf_unid_destino">
+                    <option value="">Selecione o destino</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+            <label>Buscar por TAG (opcional)</label>
+            <input type="text" id="transf_unid_filtro" placeholder="Digite parte da TAG..." oninput="filtrarUnidadesTransferencia()">
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 14px; color: #374151;">Unidades Disponíveis</h3>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span id="transf_unid_contador" style="font-size: 13px; color: #6b7280;">0 selecionada(s)</span>
+                    <label style="font-size: 13px; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                        <input type="checkbox" id="transf_unid_selecionar_todos" onchange="toggleSelecionarTodosTransferencia()"> Selecionar todas
+                    </label>
+                </div>
+            </div>
+            <div id="transf_unid_lista" style="border: 1px solid #e5e7eb; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                <div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado de origem.</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+            <button type="button" class="btn-secondary" onclick="fecharModalTransferenciaUnidades()">Cancelar</button>
+            <button type="button" class="btn-primary" onclick="confirmarTransferenciaUnidades()" style="background: #8b5cf6; min-width: 200px;">Confirmar Transferência</button>
+        </div>
+        <div id="transf_unid_mensagem" style="margin-top: 12px;"></div>
+    </div>
+</div>
+
+<!-- ===== MODAL: Manutenção em Lote ===== -->
+<div id="modal-manutencao-lote" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 28px; width: 90%; max-width: 750px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-size: 20px; color: #374151;">🔧 Envio para Manutenção em Lote</h2>
+            <button type="button" onclick="fecharModalManutencaoLote()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #9ca3af;">&times;</button>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+            <label>Almoxarifado</label>
+            <select id="manut_lote_almoxarifado" onchange="carregarUnidadesManutencaoLote()">
+                <option value="">Selecione o almoxarifado</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <div class="form-group" style="flex: 2;">
+                <label>Descrição da Manutenção *</label>
+                <input type="text" id="manut_lote_descricao" placeholder="Ex: Calibração preventiva - Lote Jul/2026">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Fornecedor (opcional)</label>
+                <input type="text" id="manut_lote_fornecedor" placeholder="Ex: CalibraTech">
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+            <label>Buscar por TAG (opcional)</label>
+            <input type="text" id="manut_lote_filtro" placeholder="Digite parte da TAG..." oninput="filtrarUnidadesManutencaoLote()">
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 14px; color: #374151;">Unidades Disponíveis</h3>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span id="manut_lote_contador" style="font-size: 13px; color: #6b7280;">0 selecionada(s)</span>
+                    <label style="font-size: 13px; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                        <input type="checkbox" id="manut_lote_selecionar_todos" onchange="toggleSelecionarTodosManutencao()"> Selecionar todas
+                    </label>
+                </div>
+            </div>
+            <div id="manut_lote_lista" style="border: 1px solid #e5e7eb; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                <div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado para listar as unidades.</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+            <button type="button" class="btn-secondary" onclick="fecharModalManutencaoLote()">Cancelar</button>
+            <button type="button" class="btn-primary" onclick="confirmarManutencaoLote()" style="background: #f59e0b; min-width: 200px;">Enviar para Manutenção</button>
+        </div>
+        <div id="manut_lote_mensagem" style="margin-top: 12px;"></div>
+    </div>
+</div>
+
+<!-- ===== MODAL: Retorno de Manutenção em Lote ===== -->
+<div id="modal-retorno-manutencao-lote" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 28px; width: 90%; max-width: 750px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-size: 20px; color: #374151;">✅ Retorno de Manutenção em Lote</h2>
+            <button type="button" onclick="fecharModalRetornoManutencaoLote()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #9ca3af;">&times;</button>
+        </div>
+        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
+            <div class="form-group" style="flex: 1;">
+                <label>Almoxarifado de Destino *</label>
+                <select id="retorno_lote_destino">
+                    <option value="">Selecione o destino</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>Custo da Manutenção (opcional)</label>
+                <input type="number" id="retorno_lote_custo" placeholder="Ex: 150.00" step="0.01">
+            </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+            <label>Buscar por TAG (opcional)</label>
+            <input type="text" id="retorno_lote_filtro" placeholder="Digite parte da TAG..." oninput="filtrarUnidadesRetornoLote()">
+        </div>
+        <div style="margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h3 style="margin: 0; font-size: 14px; color: #374151;">Unidades em Manutenção</h3>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span id="retorno_lote_contador" style="font-size: 13px; color: #6b7280;">0 selecionada(s)</span>
+                    <label style="font-size: 13px; color: #2563eb; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                        <input type="checkbox" id="retorno_lote_selecionar_todos" onchange="toggleSelecionarTodosRetorno()"> Selecionar todas
+                    </label>
+                </div>
+            </div>
+            <div id="retorno_lote_lista" style="border: 1px solid #e5e7eb; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                <div style="text-align: center; color: #9ca3af; padding: 24px;">Carregando unidades em manutenção...</div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+            <button type="button" class="btn-secondary" onclick="fecharModalRetornoManutencaoLote()">Cancelar</button>
+            <button type="button" class="btn-primary" onclick="confirmarRetornoManutencaoLote()" style="background: #10b981; min-width: 200px;">Confirmar Retorno</button>
+        </div>
+        <div id="retorno_lote_mensagem" style="margin-top: 12px;"></div>
+    </div>
+</div>
 
 </body>
 </html>
