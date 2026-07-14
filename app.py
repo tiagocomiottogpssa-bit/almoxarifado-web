@@ -2835,6 +2835,8 @@ print("Rotas registradas:")
 for rule in app.url_map.iter_rules():
     print(f"  {rule.rule} -> {rule.endpoint}")
 
+init_db()
+
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'criar-usuario' and len(sys.argv) == 4:
         init_db()
