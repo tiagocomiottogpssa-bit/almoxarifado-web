@@ -86,7 +86,8 @@ else:
     # ============================================================
     # MODO DESENVOLVIMENTO (SQLite)
     # ============================================================
-    DATABASE = 'sistema.db'
+    import os
+    DATABASE = os.environ.get('DB_PATH', 'sistema.db')
 
     @contextmanager
     def get_connection():
