@@ -2853,7 +2853,7 @@ function loadProdutosSelectUnidades() {
         return;
     }
     
-    fetch(`http://127.0.0.1:5000/produtos`, {
+    fetch(`${API_BASE}/produtos`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
     })
     .then(res => res.json())
@@ -3521,7 +3521,7 @@ async function loadAuditoria() {
 function loadUnidades() {
     const token = localStorage.getItem('access_token');
     
-    fetch('http://127.0.0.1:5000/unidades', {
+    fetch(`${API_BASE}/unidades`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => res.json())
@@ -3589,8 +3589,8 @@ function salvarUnidade() {
     const body = { produto_id: parseInt(produto_id), tag, numero_serie, status };
 
     const url = id
-        ? `http://127.0.0.1:5000/unidades/${id}`
-        : 'http://127.0.0.1:5000/unidades';
+        ? `${API_BASE}/unidades/${id}`
+        : `${API_BASE}/unidades`;
 
     const method = id ? 'PUT' : 'POST';
 
@@ -3627,7 +3627,7 @@ function limparFormUnidade() {
 function editarUnidade(id) {
     const token = localStorage.getItem('access_token');
     
-    fetch(`http://127.0.0.1:5000/unidades`, {
+    fetch(`${API_BASE}/unidades`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => res.json())
@@ -3653,7 +3653,7 @@ function excluirUnidade(id) {
 
     const token = localStorage.getItem('access_token');
 
-    fetch(`http://127.0.0.1:5000/unidades/${id}`, {
+    fetch(`${API_BASE}/unidades/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -3674,7 +3674,7 @@ function loadUnidadesSelectEmprestimo() {
     const select = document.getElementById('emprestimo_unidade_id');
     if (!select) return;
     
-    fetch('http://127.0.0.1:5000/unidades', {
+    fetch(`${API_BASE}/unidades`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
     })
     .then(res => res.json())
@@ -3700,7 +3700,7 @@ document.addEventListener('change', function(e) {
 
 // Carrega colaboradores
 function loadColaboradores() {
-    fetch('http://127.0.0.1:5000/colaboradores', {
+    fetch(`${API_BASE}/colaboradores`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
     })
     .then(res => res.json())
@@ -3727,7 +3727,7 @@ function emprestarUnidade() {
 
     const hoje = new Date().toISOString().split('T')[0];
 
-    fetch('http://127.0.0.1:5000/emprestimos', {
+    fetch(`${API_BASE}/emprestimos`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -3760,7 +3760,7 @@ function devolverUnidade() {
     const unidade_id = document.getElementById('emprestimo_unidade_id').value;
     if (!unidade_id) { alert('Selecione uma unidade.'); return; }
 
-    fetch('http://127.0.0.1:5000/emprestimos/devolver', {
+    fetch(`${API_BASE}/emprestimos/devolver`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -3792,7 +3792,7 @@ function enviarManutencao() {
     if (!unidade_id) { alert('Selecione uma unidade.'); return; }
     if (!obs) { alert('Descreva o motivo da manutenção na observação.'); return; }
 
-    fetch('http://127.0.0.1:5000/emprestimos/manutencao', {
+    fetch(`${API_BASE}/emprestimos/manutencao`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -3819,7 +3819,7 @@ function enviarManutencao() {
 
 // Carrega histórico de empréstimos
 function loadEmprestimos() {
-    fetch('http://127.0.0.1:5000/emprestimos', {
+    fetch(`${API_BASE}/emprestimos`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
     })
     .then(res => res.json())
@@ -3918,7 +3918,7 @@ function salvarColaborador() {
 
     const token = localStorage.getItem('access_token');
     const body = { nome, matricula, telefone, email, setor, cargo:funcao };
-    const url = id ? `http://127.0.0.1:5000/colaboradores/${id}` : 'http://127.0.0.1:5000/colaboradores';
+    const url = id ? `${API_BASE}/colaboradores/${id}` : `${API_BASE}/colaboradores`;
     const method = id ? 'PUT' : 'POST';
 
     fetch(url, {
@@ -3957,7 +3957,7 @@ function limparFormColaborador() {
 function loadColaboradores() {
     const token = localStorage.getItem('access_token');
     
-    fetch('http://127.0.0.1:5000/colaboradores', {
+    fetch(`${API_BASE}/colaboradores`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => res.json())
@@ -3998,7 +3998,7 @@ function loadColaboradores() {
 function editarColaborador(id) {
     const token = localStorage.getItem('access_token');
     
-    fetch('http://127.0.0.1:5000/colaboradores', {
+    fetch(`${API_BASE}/colaboradores`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => res.json())
@@ -4023,7 +4023,7 @@ function excluirColaborador(id) {
     
     const token = localStorage.getItem('access_token');
     
-    fetch(`http://127.0.0.1:5000/colaboradores/${id}`, {
+    fetch(`${API_BASE}/colaboradores/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
     })
@@ -4044,7 +4044,7 @@ function excluirColaborador(id) {
 function exportarColaboradores() {
     const token = localStorage.getItem('access_token');
     
-    fetch('http://127.0.0.1:5000/colaboradores/exportar', {
+    fetch(`${API_BASE}/colaboradores/exportar`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => {
@@ -4077,7 +4077,7 @@ function importarColaboradores(input) {
     const formData = new FormData();
     formData.append('file', file);
 
-    fetch('http://127.0.0.1:5000/colaboradores/importar', {
+    fetch(`${API_BASE}/colaboradores/importar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
@@ -4104,7 +4104,7 @@ function importarColaboradores(input) {
 function exportarUnidades() {
     const token = localStorage.getItem('access_token');
     
-    fetch('http://127.0.0.1:5000/unidades/exportar', {
+    fetch(`${API_BASE}/unidades/exportar`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
     .then(res => {
@@ -4137,7 +4137,7 @@ function importarUnidades(input) {
     const formData = new FormData();
     formData.append('file', file);
 
-    fetch('http://127.0.0.1:5000/unidades/importar', {
+    fetch(`${API_BASE}/unidades/importar`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
