@@ -188,6 +188,12 @@ def init_db():
                 "CHECK(perfil IN ('admin', 'operador', 'visualizador'))"
             )
 
+         # Migração da coluna ativo
+        if not _column_exists(conn, 'usuarios', 'ativo'):
+            conn.execute(
+                "ALTER TABLE usuarios ADD COLUMN ativo INTEGER DEFAULT 1"
+            )
+
         # Tabela de log de auditoria
         conn.execute('''CREATE TABLE IF NOT EXISTS log_auditoria (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
