@@ -200,6 +200,14 @@ def init_db():
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         )''')
         _create_transferencias(conn)
+                # Criar usuário admin padrão se não existir
+        cursor = conn.execute("SELECT COUNT(*) FROM usuarios")
+        if cursor.fetchone()[0] == 0:
+            from werkzeug.security import generate_password_hash
+            conn.execute(
+                "INSERT INTO usuarios (username, password, perfil) VALUES (?, ?, ?)",
+                ('admin', generate_password_hash('admin123'), 'admin')
+            )
         conn.commit()
 
 
