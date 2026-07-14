@@ -1,4 +1,1 @@
-Set-Content -Path "mise.toml" -Value @"
-[settings]
-python.github_attestations = false
-"@
+Set-Content -Path "mise.toml" -Value '[settings]', 'python.github_attestations = false'
