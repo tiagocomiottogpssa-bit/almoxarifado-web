@@ -10,6 +10,9 @@ import datetime
 # Caso contrário, usa SQLite (desenvolvimento local).
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
+print(f"DEBUG: DATABASE_URL = '{DATABASE_URL}'")
+print(f"DEBUG: USE_POSTGRES = {bool(DATABASE_URL)}")
+print(f"DEBUG: All env keys with DB = {[k for k in os.environ.keys() if 'DB' in k.upper()]}")
 
 # Railway às vezes fornece como postgres:// em vez de postgresql://
 if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
