@@ -217,7 +217,7 @@ def init_db():
         _create_transferencias(conn)
                 # Criar usuário admin padrão se não existir
         cursor = conn.execute("SELECT COUNT(*) FROM usuarios")
-        if cursor.fetchone()[0] == 0:
+        if cursor.fetchone()['count'] == 0:
             from werkzeug.security import generate_password_hash
             conn.execute(
                 "INSERT INTO usuarios (username, password, perfil) VALUES (?, ?, ?)",
