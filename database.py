@@ -194,6 +194,12 @@ def init_db():
                 "ALTER TABLE usuarios ADD COLUMN ativo INTEGER DEFAULT 1"
             )
 
+        # Migração da coluna email
+        if not _column_exists(conn, 'usuarios', 'email'):
+            conn.execute(
+                "ALTER TABLE usuarios ADD COLUMN email TEXT"
+            )
+
         # Tabela de log de auditoria
         conn.execute('''CREATE TABLE IF NOT EXISTS log_auditoria (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
