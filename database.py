@@ -396,7 +396,7 @@ def _create_unidades(conn):
             status TEXT DEFAULT 'disponivel',
             localizacao TEXT,
             data_aquisicao TEXT,
-            requer_calibracao BOOLEAN DEFAULT 0,
+            requer_calibracao BOOLEAN DEFAULT FALSE,
             data_validade_calibracao TEXT,
             numero_certificado TEXT,
             data_ultima_manutencao TEXT,
@@ -533,7 +533,7 @@ def _migrate_produtos_depreciacao(conn):
     - controla_depreciacao: indica se o produto controla depreciação (0 = não, 1 = sim)
     """
     if not _column_exists(conn, "produtos", "controla_depreciacao"):
-        conn.execute("ALTER TABLE produtos ADD COLUMN controla_depreciacao BOOLEAN DEFAULT 0")
+        conn.execute("ALTER TABLE produtos ADD COLUMN controla_depreciacao BOOLEAN DEFAULT TRUE")
     
     conn.commit()
 
