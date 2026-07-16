@@ -194,8 +194,19 @@ def init_db():
          # Migração da coluna ativo
         if not _column_exists(conn, 'usuarios', 'ativo'):
             conn.execute(
-                "ALTER TABLE usuarios ADD COLUMN ativo INTEGER DEFAULT 1"
+                "ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT TRUE"
             )
+        else:
+            # Converte coluna ativo de INTEGER para BOOLEAN se necessário
+            col_info = conn.execute(
+                "SELECT data_type FROM information_schema.columns "
+                "WHERE table_name = 'usuarios' AND column_name = 'ativo'"
+            ).fetchone()
+            if col_info and col_info['data_type'] != 'boolean':
+                conn.execute(
+                    "ALTER TABLE usuarios ALTER COLUMN ativo "
+                    "TYPE BOOLEAN USING ativo::BOOLEAN"
+                )
 
         # Migração da coluna email
         if not _column_exists(conn, 'usuarios', 'email'):

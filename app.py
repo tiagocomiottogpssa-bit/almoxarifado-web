@@ -206,7 +206,7 @@ def atualizar_usuario(id):
                 params.append(email)
             if password:
                 hashed = generate_password_hash(password)
-                updates.append('senha = ?')
+                updates.append('password = ?')
                 params.append(hashed)
             if perfil:
                 updates.append('perfil = ?')
