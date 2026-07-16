@@ -213,7 +213,7 @@ def atualizar_usuario(id):
                 params.append(perfil)
             if ativo is not None:
                 updates.append('ativo = ?')
-                params.append(True if ativo else False)
+                params.append(1 if ativo else 0)
 
             if not updates:
                 return response(False, message='Nenhum campo para atualizar.', status_code=400)
