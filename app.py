@@ -213,7 +213,7 @@ def atualizar_usuario(id):
                 params.append(perfil)
             if ativo is not None:
                 updates.append('ativo = ?')
-                params.append(1 if ativo else 0)
+                params.append(True if ativo else False)
 
             if not updates:
                 return response(False, message='Nenhum campo para atualizar.', status_code=400)
@@ -1010,7 +1010,7 @@ def criar_unidade():
 
     # Converte boolean para int (SQLite armazena 0/1)
     requer_calibracao_raw = data.get('requer_calibracao', False)
-    requer_calibracao = 1 if requer_calibracao_raw else 0
+    requer_calibracao = True if requer_calibracao_raw else False
 
     valores = {
         'produto_id': produto_id,
@@ -1081,7 +1081,7 @@ def atualizar_unidade(id):
 
     # Converte boolean para int (SQLite armazena 0/1)
     requer_calibracao_raw = data.get('requer_calibracao', False)
-    requer_calibracao = 1 if requer_calibracao_raw else 0
+    requer_calibracao = True if requer_calibracao_raw else False
 
     valores = {
         'produto_id': produto_id,
