@@ -2036,7 +2036,7 @@ def listar_movimentacoes():
 
     try:
         with get_connection() as conn:
-            total = conn.execute(count_sql, params).fetchone()[0]
+            total = conn.execute(count_sql, params).fetchone()['count']
             total_pages = math.ceil(total / per_page) if per_page > 0 else 0
 
             if page > total_pages and total > 0:
