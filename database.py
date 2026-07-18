@@ -533,7 +533,12 @@ def _migrate_produtos_depreciacao(conn):
         conn.execute("ALTER TABLE produtos ADD COLUMN controla_depreciacao BOOLEAN DEFAULT TRUE")
     
     conn.commit()
-
+    
+    # Migração para campos de equipamento
+    if not _column_exists(conn, "produtos", "requer_equipamento"):
+        conn.execute("ALTER TABLE produtos ADD COLUMN requer_equipamento BOOLEAN DEFAULT FALSE")
+    if not _column_exists(conn, "produtos", "equipamentos_compativeis"):
+        conn.execute("ALTER TABLE produtos ADD COLUMN equipamentos_compativeis TEXT")
 
 def calcular_vlc_unidade(valor_aquisicao, valor_residual, vida_util_meses, data_aquisicao):
     """

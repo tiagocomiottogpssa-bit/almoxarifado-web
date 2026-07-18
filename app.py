@@ -336,8 +336,8 @@ def criar_produto():
 
     valores = {campo: data.get(campo) for campo in campos}
     valores['nome'] = nome
-    valores['controla_depreciacao'] = valores.get('controla_depreciacao', 0) or 0
-    valores['requer_equipamento'] = valores.get('requer_equipamento', 0) or 0
+    valores['controla_depreciacao'] = bool(valores.get('controla_depreciacao', 0))
+    valores['requer_equipamento'] = bool(valores.get('requer_equipamento', 0))
     valores['created_at'] = now_iso()
     valores['updated_at'] = now_iso()
 
@@ -386,6 +386,12 @@ def atualizar_produto(id):
             if campo == 'nome':
                 valor = valor.strip() if valor else ''
             valores[campo] = valor
+
+        # Converte campos booleanos para compatibilidade com PostgreSQL
+    if 'controla_depreciacao' in valores:
+        valores['controla_depreciacao'] = bool(valores['controla_depreciacao'])
+    if 'requer_equipamento' in valores:
+        valores['requer_equipamento'] = bool(valores['requer_equipamento'])
 
     # ✅ Valida nome apenas se foi enviado
     if 'nome' in valores and not valores['nome']:
