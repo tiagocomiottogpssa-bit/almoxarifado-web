@@ -174,6 +174,7 @@ def init_db():
         _create_colaboradores(conn)
         _migrate_movimentacoes(conn)
         _migrate_movimentacoes_extras(conn)
+        _migrate_estoque_updated_at(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)
         _migrate_unidades_depreciacao(conn)
@@ -390,6 +391,11 @@ def _migrate_movimentacoes_extras(conn):
         conn.execute("ALTER TABLE movimentacoes ADD COLUMN equipamento_id INTEGER")
     conn.commit()
 
+def _migrate_estoque_updated_at(conn):
+    """Adiciona coluna updated_at na tabela estoque."""
+    if not _column_exists(conn, 'estoque', 'updated_at'):
+        conn.execute("ALTER TABLE estoque ADD COLUMN updated_at TIMESTAMP")
+    conn.commit()
 
 def _create_unidades(conn):
     conn.execute("""
