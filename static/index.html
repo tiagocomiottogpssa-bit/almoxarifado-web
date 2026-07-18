@@ -29,6 +29,7 @@ h3 { font-size: 15px; }
 .main-content { margin-left: 240px; padding: 20px; min-height: 100vh; }
 
 /* Formulários */
+.form-row { display: flex; gap: 16px; align-items: flex-start; }
 .form-group { margin-bottom: 15px; }
 label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; }
 input[type="text"], input[type="password"], input[type="number"], select, textarea {
@@ -223,61 +224,57 @@ th, td {
                 <form id="produtoForm" onsubmit="return submitProduto(event)">
             <input type="hidden" id="produtoId">
 
-            <!-- Linha 1: Nome do Produto (linha inteira) -->
-            <div class="form-row">
-                <div class="form-group" style="flex: 1;">
-                    <label>Nome do Produto <span style="color: #ef4444;">*</span></label>
-                    <input type="text" id="nome" required placeholder="Ex: Esmerilhadeira Angular 7&quot;">
-                </div>
-            </div>
-
-            <!-- Linha 2: Código Interno + Preço -->
-            <div class="form-row">
-                <div class="form-group" style="flex: 1;">
-                    <label>Código Interno</label>
-                    <input type="text" id="codigo_interno" placeholder="Ex: FERR-001">
-                </div>
-                <div class="form-group" style="flex: 0.4;">
-                    <label>Preço (R$)</label>
-                    <input type="number" step="0.01" id="preco" value="0" style="text-align: right;">
-                </div>
-            </div>
-
-            <!-- Linha 3: Estoque Mínimo + Unidade -->
-            <div class="form-row">
-                <div class="form-group" style="flex: 0.4;">
-                    <label>Estoque Mínimo</label>
-                    <input type="number" id="estoque_minimo" value="0" min="0" style="text-align: right;">
-                </div>
-                <div class="form-group" style="flex: 0.4;">
-                    <label>Unidade</label>
-                    <input type="text" id="unidade" placeholder="Ex: UN, CX, KG, LT">
-                </div>
-            </div>
-
-            <!-- Linha 4: Rastreabilidade com bolinhas -->
-            <div class="form-row">
-                <div class="form-group" style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px;">Tipo de Rastreabilidade</label>
-                    <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-                        <label class="radio-bolinha">
-                            <input type="radio" name="rastreabilidade" value="nenhum" checked>
-                            <span class="radio-mark"></span>
-                            Nenhum
-                        </label>
-                        <label class="radio-bolinha">
-                            <input type="radio" name="rastreabilidade" value="lote">
-                            <span class="radio-mark"></span>
-                            Lote / Corrida
-                        </label>
-                        <label class="radio-bolinha">
-                            <input type="radio" name="rastreabilidade" value="calibracao">
-                            <span class="radio-mark"></span>
-                            Calibração
-                        </label>
-                    </div>
-                </div>
-            </div>
+            <!-- Linha 1: Nome + Código Interno (mesma linha) -->
+<div class="form-row">
+    <div class="form-group" style="flex: 1;">
+        <label>Nome do Produto <span style="color: #ef4444;">*</span></label>
+        <input type="text" id="nome" required placeholder="Ex: Esmerilhadeira Angular 7&quot;">
+    </div>
+    <div class="form-group" style="flex: 0.4;">
+        <label>Código Interno</label>
+        <input type="text" id="codigo_interno" placeholder="Ex: FERR-001">
+    </div>
+</div>
+<!-- Linha 2: Estoque Mínimo + Unidade -->
+<div class="form-row">
+    <div class="form-group" style="flex: 0.3;">
+        <label>Estoque Mínimo</label>
+        <input type="number" id="estoque_minimo" value="0" min="0" style="text-align: right;">
+    </div>
+    <div class="form-group" style="flex: 0.3;">
+        <label>Unidade</label>
+        <input type="text" id="unidade" placeholder="Ex: UN, CX, KG, LT">
+    </div>
+</div>
+<!-- Linha 3: Rastreabilidade + Sobressalente -->
+<div class="form-row">
+    <div class="form-group" style="flex: 1;">
+        <label style="display: block; margin-bottom: 8px;">Tipo de Rastreabilidade</label>
+        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+            <label class="radio-bolinha">
+                <input type="radio" name="rastreabilidade" value="nenhum" checked>
+                <span class="radio-mark"></span>
+                Nenhum
+            </label>
+            <label class="radio-bolinha">
+                <input type="radio" name="rastreabilidade" value="lote">
+                <span class="radio-mark"></span>
+                Lote / Corrida
+            </label>
+            <label class="radio-bolinha">
+                <input type="radio" name="rastreabilidade" value="calibracao">
+                <span class="radio-mark"></span>
+                Calibração
+            </label>
+        </div>
+    </div>
+    <div class="form-group" style="flex: 0.3; display: flex; align-items: flex-end; justify-content: flex-end; padding-bottom: 4px;">
+        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="sobressalente" value="1" style="width: 18px; height: 18px; accent-color: #2563eb;">
+            <span style="font-size: 14px;">Sobressalente</span>
+        </label>
+    </div>
+</div>
 
             <!-- Botões -->
             <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
@@ -300,7 +297,7 @@ th, td {
                 <span id="totalProdutos" style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
             </div>
         </div>
-        <div style="overflow-x: auto;">
+        <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
             <table>
                 <thead>
                     <tr>
@@ -308,8 +305,8 @@ th, td {
                         <th>Nome</th>
                         <th>Rastreab.</th>
                         <th>Estoque Minimo</th>
-                        <th>Unidade</th>    
-                        <th style="text-align: right;">Preço</th>
+                        <th>Unidade</th>
+                        <th style="text-align: center;">Sobr.</th>    
                         <th style="text-align: center;">Ações</th>
                     </tr>
                 </thead>
@@ -430,7 +427,7 @@ th, td {
         <h2 style="margin: 0;">🔄 Transferências Pendentes</h2>
         <button onclick="loadTransferencias()" class="btn-secondary" style="font-size: 13px;">🔄 Atualizar</button>
     </div>
-    <div style="overflow-x: auto;">
+    <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
         <table>
             <thead>
                 <tr>
@@ -459,7 +456,7 @@ th, td {
             <button onclick="limparFiltroMovimentacoes()" class="btn-secondary" style="font-size: 13px;">Limpar</button>
         </div>
         <div id="movimentacoes-lista-message"></div>
-        <div style="overflow-x: auto;">
+        <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
             <table>
                 <thead>
                     <tr>
@@ -608,7 +605,7 @@ th, td {
                     <h3 style="margin: 0; color: #374151; font-size: 16px;">Unidades Cadastradas</h3>
                     <span style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
                 </div>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -682,7 +679,7 @@ th, td {
                     <h3 style="margin: 0; color: #374151; font-size: 16px;">Histórico de Empréstimos</h3>
                     <button class="btn-secondary" style="font-size: 13px;" onclick="loadEmprestimos()">🔄 Atualizar</button>
                 </div>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -788,7 +785,7 @@ th, td {
                 <h3 style="margin: 0; color: #374151; font-size: 16px;">Colaboradores Cadastrados</h3>
                 <span id="contador-colaboradores" style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
             </div>
-            <div style="overflow-x: auto;">
+            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
@@ -890,7 +887,7 @@ th, td {
                 <h3 style="margin: 0; color: #374151; font-size: 16px;">Usuários Cadastrados</h3>
                 <span id="totalUsuarios" style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
             </div>
-            <div style="overflow-x: auto;">
+            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
@@ -960,7 +957,7 @@ th, td {
             <!-- Maiores Consumidores -->
             <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
                 <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #374151;">🏆 Maiores Consumidores</h3>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -983,7 +980,7 @@ th, td {
             <!-- Gastos por Tipo -->
             <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
                 <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #374151;">💰 Gastos por Tipo</h3>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -1009,7 +1006,7 @@ th, td {
             <!-- Equipamentos em Manutenção -->
             <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
                 <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #374151;">🔧 Equipamentos em Manutenção</h3>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -1032,7 +1029,7 @@ th, td {
             <!-- Calibrações a Vencer -->
             <div style="border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px;">
                 <h3 style="margin: 0 0 12px 0; font-size: 15px; color: #374151;">📅 Calibrações a Vencer (30 dias)</h3>
-                <div style="overflow-x: auto;">
+                <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
@@ -1217,7 +1214,7 @@ th, td {
                     <button type="button" class="btn-secondary" style="font-size: 13px;" onclick="carregarEstoque()">🔄 Atualizar</button>
                 </div>
             </div>
-            <div style="overflow-x: auto;">
+            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
@@ -1320,7 +1317,7 @@ th, td {
                 <h3 style="margin: 0; color: #374151; font-size: 16px;">Almoxarifados Cadastrados</h3>
                 <span style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
             </div>
-            <div style="overflow-x: auto;">
+            <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
@@ -1350,7 +1347,7 @@ th, td {
     <div class="card">
         <h2>📋 Log de Auditoria</h2>
         <div id="auditoria-message"></div>
-        <div style="overflow-x: auto;">
+        <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
             <table>
                 <thead>
                     <tr>
@@ -2651,9 +2648,9 @@ function submitProduto(event) {
     const data = {
         nome: document.getElementById('nome').value,
         codigo_interno: document.getElementById('codigo_interno').value,
-        preco: document.getElementById('preco').value,
         estoque_minimo: document.getElementById('estoque_minimo').value || 0,
         unidade: document.getElementById('unidade').value || '',
+        sobressalente: document.getElementById('sobressalente').checked ? 1 : 0,
         rastreabilidade: document.querySelector('input[name="rastreabilidade"]:checked').value
     };
 
@@ -2721,7 +2718,7 @@ function renderProdutos() {
                     <td>${p.rastreabilidade || '-'}</td>
                     <td>${p.estoque_minimo || 0}</td>
                     <td>${p.unidade || '-'}</td>
-                    <td style="text-align: right; font-weight: 600;">R$ ${parseFloat(p.preco || 0).toFixed(2)}</td>
+                    <td style="text-align: center;">${p.sobressalente ? '✅' : '—'}</td>
                     <td style="text-align: center;">
                         <button onclick="editarProduto(${p.id})" class="btn-sm" title="Editar">✏️</button>
                         <button onclick="excluirProduto(${p.id})" class="btn-sm btn-danger" title="Excluir">🗑️</button>
@@ -2749,7 +2746,7 @@ function editarProduto(id) {
             document.getElementById('produtoId').value = p.id;
             document.getElementById('nome').value = p.nome;
             document.getElementById('codigo_interno').value = p.codigo_interno || '';
-            document.getElementById('preco').value = p.preco;
+            document.getElementById('sobressalente').checked = p.sobressalente == 1 || p.sobressalente === true;
             document.getElementById('estoque_minimo').value = p.estoque_minimo || 0;
             document.getElementById('unidade').value = p.unidade || '';
             
@@ -2780,9 +2777,9 @@ function excluirProduto(id) {
 function limparFormProduto() {
     document.getElementById('produtoId').value = '';
     document.getElementById('produtoForm').reset();
-    document.getElementById('preco').value = '0';
     document.getElementById('estoque_minimo').value = '0';
     document.getElementById('unidade').value = '';
+    document.getElementById('sobressalente').checked = false;
     document.querySelector('input[name="rastreabilidade"][value="nenhum"]').checked = true;
     document.getElementById('btnTexto').textContent = 'Salvar Produto';
 }

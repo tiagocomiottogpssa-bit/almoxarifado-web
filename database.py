@@ -163,6 +163,12 @@ def _copy_common_columns(conn, source, dest, columns):
 # CRIAÇÃO E MIGRAÇÃO DE TABELAS
 # ============================================================
 
+def _migrate_produtos_sobressalente(conn):
+    """Adiciona coluna sobressalente à tabela produtos."""
+    if not _column_exists(conn, 'produtos', 'sobressalente'):
+        conn.execute("ALTER TABLE produtos ADD COLUMN sobressalente BOOLEAN DEFAULT FALSE")
+        print("Migração: coluna 'sobressalente' adicionada à tabela produtos.")
+
 def init_db():
     """Cria/atualiza todas as tabelas do banco."""
     with get_connection() as conn:
@@ -176,10 +182,13 @@ def init_db():
         _migrate_movimentacoes_extras(conn)
         _migrate_estoque_updated_at(conn)
         _migrate_colaboradores_matricula(conn)
+        _migrate_emprestimos(conn)
+        _migrate_produtos_sobressalente(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)
         _migrate_unidades_depreciacao(conn)
-        _migrate_produtos_depreciacao(conn) 
+        _migrate_produtos_depreciacao(conn)
+        _migrate_produtos_sobressalente(conn) 
         _create_equipamentos(conn)
         _create_pedidos_compra(conn)
 
@@ -216,7 +225,7 @@ def init_db():
         )''')
         _create_transferencias(conn)
                 # Criar usuário admin padrão se não existir
-        cursor = conn.execute("SELECT COUNT(*) FROM usuarios")
+        cursor = conn.execute("SELECT COUNT(*) as count FROM usuarios")
         if cursor.fetchone()['count'] == 0:
             from werkzeug.security import generate_password_hash
             conn.execute(
@@ -402,6 +411,31 @@ def _migrate_colaboradores_matricula(conn):
     """Adiciona coluna matricula na tabela colaboradores."""
     if not _column_exists(conn, 'colaboradores', 'matricula'):
         conn.execute("ALTER TABLE colaboradores ADD COLUMN matricula TEXT")
+    conn.commit()
+
+def _migrate_emprestimos(conn):
+    """Cria tabela de emprestimos se nao existir."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emprestimos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            unidade_id INTEGER,
+            colaborador_id INTEGER,
+            data_emprestimo TIMESTAMP,
+            data_devolucao TIMESTAMP,
+            observacao TEXT,
+            status TEXT DEFAULT 'ativo',
+            tipo TEXT DEFAULT 'emprestimo',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (unidade_id) REFERENCES unidades(id),
+            FOREIGN KEY (colaborador_id) REFERENCES colaboradores(id)
+        )
+    """)
+    conn.commit()
+
+def _migrate_produtos_sobressalente(conn):
+    """Adiciona coluna sobressalente na tabela produtos."""
+    if not _column_exists(conn, 'produtos', 'sobressalente'):
+        conn.execute("ALTER TABLE produtos ADD COLUMN sobressalente INTEGER DEFAULT 0")
     conn.commit()
 
 def _create_unidades(conn):

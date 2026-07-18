@@ -330,7 +330,7 @@ def criar_produto():
     campos = [
         'nome', 'codigo_interno', 'codigo_fabricante', 'codigo_barras',
         'descricao', 'categoria', 'tipo', 'unidade', 'preco', 'valor_unitario',
-        'estoque_minimo', 'rastreabilidade', 'controla_depreciacao',
+        'estoque_minimo', 'sobressalente', 'rastreabilidade', 'controla_depreciacao',
         'requer_equipamento', 'equipamentos_compativeis'
     ]
 
@@ -374,7 +374,7 @@ def atualizar_produto(id):
     campos = [
         'nome', 'codigo_interno', 'codigo_fabricante', 'codigo_barras',
         'descricao', 'categoria', 'tipo', 'unidade', 'preco', 'valor_unitario',
-        'estoque_minimo', 'rastreabilidade', 'controla_depreciacao',
+        'estoque_minimo', 'sobressalente', 'rastreabilidade', 'controla_depreciacao',
         'requer_equipamento', 'equipamentos_compativeis'
     ]
 
@@ -2180,6 +2180,111 @@ def criar_movimentacao():
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return response(False, message=str(e), status_code=500)
+
+# ============================================================
+# EMPRÉSTIMOS
+# ============================================================
+@app.route('/emprestimos', methods=['GET'])
+@jwt_required()
+def listar_emprestimos():
+    try:
+        with get_connection() as conn:
+            rows = conn.execute('''
+                SELECT ep.*, u.numero_serie, p.nome as produto_nome,
+                       c.nome as colaborador_nome
+                FROM emprestimos ep
+                LEFT JOIN unidades u ON ep.unidade_id = u.id
+                LEFT JOIN produtos p ON u.produto_id = p.id
+                LEFT JOIN colaboradores c ON ep.colaborador_id = c.id
+                ORDER BY ep.data_emprestimo DESC
+            ''').fetchall()
+        return response(True, data=rows_to_dict(rows))
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/emprestimos', methods=['POST'])
+@jwt_required()
+def criar_emprestimo():
+    data = request.get_json() or {}
+    unidade_id = data.get('unidade_id')
+    colaborador_id = data.get('colaborador_id')
+    data_emprestimo = data.get('data_emprestimo')
+    observacao = data.get('observacao', '')
+    tipo = data.get('tipo', 'emprestimo')
+    if not unidade_id or not colaborador_id:
+        return response(False, message='Unidade e colaborador são obrigatórios.', status_code=400)
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                '''INSERT INTO emprestimos
+                   (unidade_id, colaborador_id, data_emprestimo, observacao, status, tipo, created_at)
+                   VALUES (?, ?, ?, ?, 'ativo', ?, ?)''',
+                (unidade_id, colaborador_id, data_emprestimo, observacao, tipo, now_iso())
+            )
+            conn.execute(
+                'UPDATE unidades SET status = ? WHERE id = ?',
+                ('emprestado', unidade_id)
+            )
+            conn.commit()
+        return response(True, message='Empréstimo registrado com sucesso.')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/emprestimos/devolver', methods=['POST'])
+@jwt_required()
+def devolver_emprestimo():
+    data = request.get_json() or {}
+    unidade_id = data.get('unidade_id')
+    observacao = data.get('observacao', '')
+    if not unidade_id:
+        return response(False, message='Unidade é obrigatória.', status_code=400)
+    try:
+        with get_connection() as conn:
+            emp = conn.execute(
+                'SELECT id FROM emprestimos WHERE unidade_id = ? AND status = ? ORDER BY id DESC LIMIT 1',
+                (unidade_id, 'ativo')
+            ).fetchone()
+            if emp:
+                conn.execute(
+                    'UPDATE emprestimos SET status = ?, data_devolucao = ? WHERE id = ?',
+                    ('devolvido', now_iso(), emp['id'])
+                )
+            conn.execute(
+                'UPDATE unidades SET status = ? WHERE id = ?',
+                ('disponivel', unidade_id)
+            )
+            conn.commit()
+        return response(True, message='Devolução registrada com sucesso.')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/emprestimos/manutencao', methods=['POST'])
+@jwt_required()
+def manutencao_emprestimo():
+    data = request.get_json() or {}
+    unidade_id = data.get('unidade_id')
+    observacao = data.get('observacao', '')
+    if not unidade_id:
+        return response(False, message='Unidade é obrigatória.', status_code=400)
+    try:
+        with get_connection() as conn:
+            emp = conn.execute(
+                'SELECT id FROM emprestimos WHERE unidade_id = ? AND status = ? ORDER BY id DESC LIMIT 1',
+                (unidade_id, 'ativo')
+            ).fetchone()
+            if emp:
+                conn.execute(
+                    'UPDATE emprestimos SET status = ?, data_devolucao = ? WHERE id = ?',
+                    ('manutencao', now_iso(), emp['id'])
+                )
+            conn.execute(
+                'UPDATE unidades SET status = ? WHERE id = ?',
+                ('manutencao', unidade_id)
+            )
+            conn.commit()
+        return response(True, message='Unidade enviada para manutenção.')
+    except Exception as e:
         return response(False, message=str(e), status_code=500)
 
 # ============================================================
