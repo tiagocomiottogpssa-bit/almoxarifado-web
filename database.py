@@ -173,6 +173,7 @@ def init_db():
         _create_estoque(conn)
         _create_colaboradores(conn)
         _migrate_movimentacoes(conn)
+        _migrate_movimentacoes_extras(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)
         _migrate_unidades_depreciacao(conn)
@@ -381,6 +382,14 @@ def _migrate_movimentacoes(conn):
     else:
         conn.execute("DROP TABLE IF EXISTS movimentacoes_new")
 
+def _migrate_movimentacoes_extras(conn):
+    """Adiciona colunas lote_corrida e equipamento_id na tabela movimentacoes."""
+    if not _column_exists(conn, 'movimentacoes', 'lote_corrida'):
+        conn.execute("ALTER TABLE movimentacoes ADD COLUMN lote_corrida TEXT")
+    if not _column_exists(conn, 'movimentacoes', 'equipamento_id'):
+        conn.execute("ALTER TABLE movimentacoes ADD COLUMN equipamento_id INTEGER")
+    conn.commit()
+
 
 def _create_unidades(conn):
     conn.execute("""
@@ -533,7 +542,7 @@ def _migrate_produtos_depreciacao(conn):
         conn.execute("ALTER TABLE produtos ADD COLUMN controla_depreciacao BOOLEAN DEFAULT TRUE")
     
     conn.commit()
-    
+
     # Migração para campos de equipamento
     if not _column_exists(conn, "produtos", "requer_equipamento"):
         conn.execute("ALTER TABLE produtos ADD COLUMN requer_equipamento BOOLEAN DEFAULT FALSE")
