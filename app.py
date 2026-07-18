@@ -2568,33 +2568,33 @@ def criar_transferencia():
         required = ['produto_id', 'almoxarifado_origem_id', 'almoxarifado_destino_id', 'quantidade']
         for field in required:
             if data.get(field) in (None, ''):
-                return response(False, msg=f'Campo obrigatório ausente: {field}', status_code=400)
+                return response(False, message=f'Campo obrigatório ausente: {field}', status_code=400)
 
         try:
             quantidade = int(quantidade)
         except (TypeError, ValueError):
-            return response(False, msg='Quantidade inválida.', status_code=400)
+            return response(False, message='Quantidade inválida.', status_code=400)
 
         if almoxarifado_origem_id == almoxarifado_destino_id:
-            return response(False, msg='Origem e destino devem ser diferentes.', status_code=400)
+            return response(False, message='Origem e destino devem ser diferentes.', status_code=400)
 
         if quantidade <= 0:
-            return response(False, msg='Quantidade deve ser maior que zero.', status_code=400)
+            return response(False, message='Quantidade deve ser maior que zero.', status_code=400)
 
         current_user = get_jwt_identity()
 
         with get_connection() as conn:
             prod = conn.execute('SELECT id, nome FROM produtos WHERE id = ?', (produto_id,)).fetchone()
             if not prod:
-                return response(False, msg='Produto não encontrado.', status_code=404)
+                return response(False, message='Produto não encontrado.', status_code=404)
 
             origem = conn.execute('SELECT id, nome FROM almoxarifados WHERE id = ?', (almoxarifado_origem_id,)).fetchone()
             if not origem:
-                return response(False, msg='Almoxarifado de origem não encontrado.', status_code=404)
+                return response(False, message='Almoxarifado de origem não encontrado.', status_code=404)
 
             destino = conn.execute('SELECT id, nome FROM almoxarifados WHERE id = ?', (almoxarifado_destino_id,)).fetchone()
             if not destino:
-                return response(False, msg='Almoxarifado de destino não encontrado.', status_code=404)
+                return response(False, message='Almoxarifado de destino não encontrado.', status_code=404)
 
             saldo_row = conn.execute(
                 'SELECT quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
@@ -2603,7 +2603,7 @@ def criar_transferencia():
             saldo_atual = saldo_row['quantidade'] if saldo_row else 0
 
             if saldo_atual < quantidade:
-                return response(False, msg='Saldo insuficiente no almoxarifado de origem.', status_code=409)
+                return response(False, message='Saldo insuficiente no almoxarifado de origem.', status_code=409)
 
             conn.execute(
                 'UPDATE estoque SET quantidade = quantidade - ? WHERE produto_id = ? AND almoxarifado_id = ?',
@@ -2645,10 +2645,10 @@ def criar_transferencia():
 
             conn.commit()
             return response(True, data={'transfer_id': transfer_id, 'saldo_origem': novo_saldo_origem},
-                          msg='Transferência enviada com sucesso.')
+                          message='Transferência enviada com sucesso.')
     except Exception:
         import traceback; traceback.print_exc()
-        return response(False, msg='Erro interno ao enviar transferência.', status_code=500)
+        return response(False, message='Erro interno ao enviar transferência.', status_code=500)
 
 @app.route('/transferencias', methods=['GET'])
 @jwt_required()
@@ -2672,7 +2672,7 @@ def listar_transferencias():
             return response(True, data=rows_to_dict(rows))
     except Exception:
         import traceback; traceback.print_exc()
-        return response(False, msg='Erro ao listar transferências.', status_code=500)
+        return response(False, message='Erro ao listar transferências.', status_code=500)
 
 @app.route('/transferencias/<int:transfer_id>/receber', methods=['POST'])
 @jwt_required()
@@ -2682,32 +2682,32 @@ def receber_transferencia(transfer_id):
         quantidade_receber = data.get('quantidade_receber')
 
         if quantidade_receber in (None, ''):
-            return response(False, msg='Campo obrigatório: quantidade_receber', status_code=400)
+            return response(False, message='Campo obrigatório: quantidade_receber', status_code=400)
 
         try:
             quantidade_receber = int(quantidade_receber)
         except (TypeError, ValueError):
-            return response(False, msg='Quantidade inválida.', status_code=400)
+            return response(False, message='Quantidade inválida.', status_code=400)
 
         if quantidade_receber <= 0:
-            return response(False, msg='Quantidade deve ser maior que zero.', status_code=400)
+            return response(False, message='Quantidade deve ser maior que zero.', status_code=400)
 
         current_user = get_jwt_identity()
 
         with get_connection() as conn:
             transfer = conn.execute('SELECT * FROM transferencias WHERE id = ?', (transfer_id,)).fetchone()
             if not transfer:
-                return response(False, msg='Transferência não encontrada.', status_code=404)
+                return response(False, message='Transferência não encontrada.', status_code=404)
 
             if transfer['status'] not in ('enviada', 'parcial'):
-                return response(False, msg='Status não permite recebimento.', status_code=400)
+                return response(False, message='Status não permite recebimento.', status_code=400)
 
             quantidade_total = transfer['quantidade_total']
             quantidade_recebida_atual = transfer['quantidade_recebida'] or 0
             nova_qtd_recebida = quantidade_recebida_atual + quantidade_receber
 
             if nova_qtd_recebida > quantidade_total:
-                return response(False, msg='Quantidade excede o total da transferência.', status_code=400)
+                return response(False, message='Quantidade excede o total da transferência.', status_code=400)
 
             produto_id = transfer['produto_id']
             destino_id = transfer['almoxarifado_destino_id']
@@ -2759,10 +2759,10 @@ def receber_transferencia(transfer_id):
 
             return response(True, data={'saldo_destino': saldo, 'status': new_status,
                                         'quantidade_recebida': nova_qtd_recebida},
-                          msg='Recebimento registrado com sucesso.')
+                          message='Recebimento registrado com sucesso.')
     except Exception:
         import traceback; traceback.print_exc()
-        return response(False, msg='Erro ao registrar recebimento.', status_code=500)
+        return response(False, message='Erro ao registrar recebimento.', status_code=500)
 
 @app.route('/transferencias/<int:transfer_id>/rejeitar', methods=['POST'])
 @jwt_required()
@@ -2775,10 +2775,10 @@ def rejeitar_transferencia(transfer_id):
         with get_connection() as conn:
             transfer = conn.execute('SELECT * FROM transferencias WHERE id = ?', (transfer_id,)).fetchone()
             if not transfer:
-                return response(False, msg='Transferência não encontrada.', status_code=404)
+                return response(False, message='Transferência não encontrada.', status_code=404)
 
             if transfer['status'] not in ('enviada', 'parcial'):
-                return response(False, msg='Status não permite rejeição.', status_code=400)
+                return response(False, message='Status não permite rejeição.', status_code=400)
 
             quantidade_total = transfer['quantidade_total']
             quantidade_recebida = transfer['quantidade_recebida'] or 0
@@ -2827,10 +2827,10 @@ def rejeitar_transferencia(transfer_id):
                 f'Transferência #{transfer_id} rejeitada: {produto_nome} - devolvido {remaining}', conn=conn)
 
             conn.commit()
-            return response(True, msg='Transferência rejeitada. Saldo devolvido à origem.')
+            return response(True, message='Transferência rejeitada. Saldo devolvido à origem.')
     except Exception:
         import traceback; traceback.print_exc()
-        return response(False, msg='Erro ao rejeitar transferência.', status_code=500)
+        return response(False, message='Erro ao rejeitar transferência.', status_code=500)
 
 
 # ============================================================
