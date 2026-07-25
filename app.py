@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+﻿from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
@@ -307,12 +307,19 @@ def login():
 def listar_produtos():
     try:
         with get_connection() as conn:
-            rows = conn.execute(
-                '''SELECT p.*, a.nome as almoxarifado_nome
-                   FROM produtos p
-                   LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
-                   ORDER BY p.nome'''
-            ).fetchall()
+            rows = conn.execute('''
+                SELECT p.*, a.nome as almoxarifado_nome,
+                    COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
+                FROM produtos p
+                LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
+                ORDER BY
+                    CASE
+                        WHEN COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) <= 0 THEN 0
+                        WHEN COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) < COALESCE(p.estoque_minimo, 0) THEN 1
+                        ELSE 2
+                    END,
+                    p.nome
+            ''').fetchall()
         return response(True, data=rows_to_dict(rows))
     except Exception as e:
         return response(False, message=str(e), status_code=500)
@@ -1268,11 +1275,11 @@ def retornar_manutencao_unidade(id):
 
             # Incrementa estoque no destino
             conn.execute(
-                '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, updated_at)
-                   VALUES (?, ?, 1, ?)
+                '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at)
+                   VALUES (?, ?, 1, COALESCE((SELECT estoque_minimo FROM produtos WHERE id = ?), 0), ?)
                    ON CONFLICT(produto_id, almoxarifado_id)
                    DO UPDATE SET quantidade = estoque.quantidade + 1, updated_at = excluded.updated_at''',
-                (produto_id, destino_id, now_iso())
+                (produto_id, destino_id, produto_id, now_iso())
             )
 
             # Movimentação de entrada
@@ -1360,11 +1367,11 @@ def retornar_manutencao_lote():
 
                 # Incrementa estoque no destino
                 conn.execute(
-                    '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, updated_at)
-                       VALUES (?, ?, 1, ?)
+                    '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at)
+                       VALUES (?, ?, 1, COALESCE((SELECT estoque_minimo FROM produtos WHERE id = ?), 0), ?)
                        ON CONFLICT(produto_id, almoxarifado_id)
                        DO UPDATE SET quantidade = estoque.quantidade + 1, updated_at = excluded.updated_at''',
-                    (produto_id, destino_id, now_iso())
+                    (produto_id, destino_id, produto_id, now_iso())
                 )
 
                 # Movimentação de entrada
@@ -1469,10 +1476,10 @@ def transferir_unidades_lote():
                 origem_id = row['almoxarifado_id']
                 tag = row['tag'] or 'sem tag'
 
-                # Atualiza almoxarifado da unidade
+                # Atualiza almoxarifado e localização da unidade
                 conn.execute(
-                    'UPDATE unidades SET almoxarifado_id = ?, updated_at = ? WHERE id = ?',
-                    (destino_id, now_iso(), uid)
+                    'UPDATE unidades SET almoxarifado_id = ?, localizacao = ?, updated_at = ? WHERE id = ?',
+                    (destino_id, destino['nome'], now_iso(), uid)
                 )
 
                 # Decrementa estoque da origem
@@ -1489,11 +1496,11 @@ def transferir_unidades_lote():
 
                 # Incrementa estoque do destino
                 conn.execute(
-                    '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, updated_at)
-                       VALUES (?, ?, 1, ?)
+                    '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at)
+                       VALUES (?, ?, 1, COALESCE((SELECT estoque_minimo FROM produtos WHERE id = ?), 0), ?)
                        ON CONFLICT(produto_id, almoxarifado_id)
                        DO UPDATE SET quantidade = estoque.quantidade + 1, updated_at = excluded.updated_at''',
-                    (produto_id, destino_id, now_iso())
+                    (produto_id, destino_id, produto_id, now_iso())
                 )
                 conn.execute('''
                     INSERT INTO movimentacoes (produto_id, almoxarifado_id, tipo, quantidade, valor_unitario, documento, observacao)
@@ -1725,17 +1732,40 @@ def upsert_estoque():
 
             # Busca quantidade anterior para comparar
             anterior = conn.execute(
-                'SELECT quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
+                'SELECT quantidade, estoque_minimo FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
                 (produto_id, almoxarifado_id)
             ).fetchone()
             qtd_anterior = anterior['quantidade'] if anterior else 0
 
+            # Define o estoque_minimo: valor enviado > 0 usa ele, senão copia do produto
+            if anterior and anterior['estoque_minimo'] is not None and anterior['estoque_minimo'] > 0:
+                minimo_anterior = anterior['estoque_minimo']
+            else:
+                minimo_anterior = 0
+                
+            if estoque_minimo and estoque_minimo > 0:
+                minimo_final = estoque_minimo
+            elif minimo_anterior > 0:
+                minimo_final = minimo_anterior
+            else:
+                # Fallback: copia o estoque_minimo do produto
+                prod_min = conn.execute(
+                    'SELECT estoque_minimo FROM produtos WHERE id = ?', (produto_id,)
+                ).fetchone()
+                minimo_final = prod_min['estoque_minimo'] if prod_min and prod_min['estoque_minimo'] else 0
+
             conn.execute(
-                '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, updated_at)
-                   VALUES (?, ?, ?, ?)
+                '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at)
+                   VALUES (?, ?, ?, ?, ?)
                    ON CONFLICT(produto_id, almoxarifado_id)
-                   DO UPDATE SET quantidade = excluded.quantidade, updated_at = excluded.updated_at''',
-                (produto_id, almoxarifado_id, quantidade, now_iso())
+                   DO UPDATE SET 
+                       quantidade = excluded.quantidade,
+                       estoque_minimo = CASE 
+                           WHEN excluded.estoque_minimo > 0 THEN excluded.estoque_minimo 
+                           ELSE estoque.estoque_minimo 
+                       END,
+                       updated_at = excluded.updated_at''',
+                (produto_id, almoxarifado_id, quantidade, minimo_final, now_iso())
             )
             conn.commit()
 
@@ -1793,11 +1823,11 @@ def transferir_estoque():
                 return response(False, message='Saldo insuficiente na origem.', status_code=409)
 
             conn.execute(
-                '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, updated_at)
-                   VALUES (?, ?, 0, ?)
+                '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at)
+                   VALUES (?, ?, 0, COALESCE((SELECT estoque_minimo FROM produtos WHERE id = ?), 0), ?)
                    ON CONFLICT(produto_id, almoxarifado_id)
                    DO UPDATE SET quantidade = estoque.quantidade, updated_at = excluded.updated_at''',
-                (produto_id, destino_id, now_iso())
+                (produto_id, destino_id, produto_id, now_iso())
             )
 
             conn.execute(
@@ -1934,43 +1964,37 @@ def importar_estoque():
 def atualizar_estoque_minimo_aba_estoque(id):
     data = request.get_json() or {}
     novo_minimo = data.get('estoque_minimo')
-
     if novo_minimo is None:
         return response(False, message="Estoque mínimo não fornecido.", status_code=400)
-
     try:
         with get_connection() as conn:
-            # 1. Descobre qual é o produto atrelado a esta linha do estoque
-            estoque = conn.execute('SELECT produto_id FROM estoque WHERE id = ?', (id,)).fetchone()
+            # Verifica se o registro de estoque existe
+            estoque = conn.execute(
+                '''SELECT e.id, e.produto_id, p.nome AS produto_nome, a.nome AS almox_nome
+                   FROM estoque e
+                   LEFT JOIN produtos p ON e.produto_id = p.id
+                   LEFT JOIN almoxarifados a ON e.almoxarifado_id = a.id
+                   WHERE e.id = ?''',
+                (id,)
+            ).fetchone()
             if not estoque:
                 return response(False, message="Registro de estoque não encontrado.", status_code=404)
-            
-            produto_id = estoque['produto_id']
 
-            # 2. Atualiza o estoque mínimo na tabela de produtos
+            # Atualiza o estoque_minimo na tabela estoque (por almoxarifado)
             agora = now_iso()
-            conn.execute('''
-                UPDATE produtos 
-                SET estoque_minimo = ?, updated_at = ? 
-                WHERE id = ?
-            ''', (novo_minimo, agora, produto_id))
-            
-            # 3. Gera o LOG DE AUDITORIA
+            conn.execute(
+                'UPDATE estoque SET estoque_minimo = ?, updated_at = ? WHERE id = ?',
+                (novo_minimo, agora, id)
+            )
+            conn.commit()
+
+            # Gera o LOG DE AUDITORIA
             current_user = get_jwt_identity()
             user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
             if user:
-                registrar_log(
-                    user['id'], 
-                    current_user, 
-                    'editar', 
-                    'produtos',
-                    f'Atualizou estoque mínimo do produto ID {produto_id} para {novo_minimo} (via aba Estoque)'
-                    ,conn=conn
-                )
-
-            conn.commit()
-            
-        return response(True, message="Estoque mínimo atualizado com sucesso.")
+                registrar_log(user['id'], current_user, 'editar', 'estoque',
+                              f'Definiu estoque mínimo de "{estoque["produto_nome"]}" em "{estoque["almox_nome"]}" para {novo_minimo}')
+            return response(True, message='Estoque mínimo atualizado para este almoxarifado.')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
@@ -2020,7 +2044,7 @@ def listar_movimentacoes():
         where_clause = ' WHERE ' + ' AND '.join(conditions)
 
     count_sql = '''
-        SELECT COUNT(*)
+        SELECT COUNT(*) AS count
         FROM movimentacoes m
         LEFT JOIN produtos p ON m.produto_id = p.id
         LEFT JOIN almoxarifados a ON m.almoxarifado_id = a.id
@@ -2299,14 +2323,15 @@ def relatorio_estoque():
 
         base_sql = '''
             SELECT p.id, p.nome, p.codigo_fabricante, p.descricao,
-                   p.estoque_minimo,
+                   COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0) as estoque_minimo,
                    COALESCE(e.saldo, 0) as saldo,
                    (SELECT pc.status FROM pedidos_compra pc WHERE pc.produto_id = p.id AND pc.status IN ('aberto','em_compra') ORDER BY pc.id DESC LIMIT 1) as pedido_status,
                    (SELECT pc.data_prevista_chegada FROM pedidos_compra pc WHERE pc.produto_id = p.id AND pc.status IN ('aberto','em_compra') ORDER BY pc.id DESC LIMIT 1) as data_prevista,
                    (SELECT pc.id FROM pedidos_compra pc WHERE pc.produto_id = p.id AND pc.status IN ('aberto','em_compra') ORDER BY pc.id DESC LIMIT 1) as pedido_id
             FROM produtos p
             LEFT JOIN (
-                SELECT produto_id, SUM(quantidade) as saldo
+                SELECT produto_id, SUM(quantidade) as saldo,
+                       SUM(COALESCE(estoque_minimo, 0)) as total_estoque_minimo
                 FROM estoque
                 GROUP BY produto_id
             ) e ON p.id = e.produto_id
@@ -2315,11 +2340,11 @@ def relatorio_estoque():
         if tipo == 'zero':
             sql = base_sql + ' WHERE COALESCE(e.saldo, 0) = 0 ORDER BY p.nome'
         elif tipo == 'critico':
-            sql = base_sql + ' WHERE COALESCE(e.saldo, 0) > 0 AND COALESCE(e.saldo, 0) <= COALESCE(p.estoque_minimo, 0) / 2 ORDER BY (COALESCE(e.saldo, 0) - p.estoque_minimo) ASC'
+            sql = base_sql + ' WHERE COALESCE(e.saldo, 0) > 0 AND COALESCE(e.saldo, 0) <= COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0) / 2 ORDER BY (COALESCE(e.saldo, 0) - COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0)) ASC'
         elif tipo == 'todos':
-            sql = base_sql + ' WHERE COALESCE(e.saldo, 0) <= COALESCE(p.estoque_minimo, 0) ORDER BY (COALESCE(e.saldo, 0) - p.estoque_minimo) ASC'
+            sql = base_sql + ' WHERE COALESCE(e.saldo, 0) <= COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0) ORDER BY (COALESCE(e.saldo, 0) - COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0)) ASC'
         else:
-            sql = base_sql + ' WHERE COALESCE(e.saldo, 0) > 0 AND COALESCE(e.saldo, 0) <= COALESCE(p.estoque_minimo, 0) AND COALESCE(e.saldo, 0) > COALESCE(p.estoque_minimo, 0) / 2 ORDER BY (COALESCE(e.saldo, 0) - p.estoque_minimo) ASC'
+            sql = base_sql + ' WHERE COALESCE(e.saldo, 0) > 0 AND COALESCE(e.saldo, 0) <= COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0) AND COALESCE(e.saldo, 0) > COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0) / 2 ORDER BY (COALESCE(e.saldo, 0) - COALESCE(e.total_estoque_minimo, p.estoque_minimo, 0)) ASC'
 
         with get_connection() as conn:
             rows = conn.execute(sql).fetchall()
@@ -2400,13 +2425,9 @@ def dashboard():
             aquisicoes_ativos = conn.execute(query_aquis, params_aquis).fetchone()['total']
 
             estoque_baixo = conn.execute(
-                '''SELECT COUNT(*) as total FROM (
-                       SELECT p.id
-                       FROM produtos p
-                       LEFT JOIN estoque e ON p.id = e.produto_id
-                       GROUP BY p.id
-                       HAVING COALESCE(SUM(e.quantidade), 0) < p.estoque_minimo
-                   )'''
+                '''SELECT COUNT(*) as total FROM estoque e
+                   WHERE e.quantidade < COALESCE(e.estoque_minimo, 
+                       (SELECT p.estoque_minimo FROM produtos p WHERE p.id = e.produto_id), 0)'''
             ).fetchone()['total']
             equip_manutencao = conn.execute(
                 "SELECT COUNT(*) as total FROM unidades WHERE status_manutencao = 'em_manutencao'"
@@ -2466,6 +2487,18 @@ def dashboard():
             ).fetchone()['total']
             # Cálculo dos totais de depreciação (VLC) via função do módulo database
             depreciacao_totais = calcular_vlc_total(conn)
+                        # Total de gastos com manutenção no período
+            query_manutencao = '''SELECT COALESCE(SUM(COALESCE(custo, 0)), 0) as total
+                   FROM manutencoes_unidades
+                   WHERE 1=1'''
+            params_manutencao = []
+            if data_inicio:
+                query_manutencao += ' AND data_envio >= ?'
+                params_manutencao.append(data_inicio)
+            if data_fim:
+                query_manutencao += ' AND data_envio <= ?'
+                params_manutencao.append(data_fim)
+            total_gastos_manutencao = conn.execute(query_manutencao, params_manutencao).fetchone()['total']
         return response(True, data={
             'gastos_consumiveis': gastos_consumiveis,
             'aquisicoes_ativos': aquisicoes_ativos,
@@ -2481,7 +2514,8 @@ def dashboard():
             'valor_aquisicao_total': depreciacao_totais.get('valor_aquisicao_total', 0),
             'vlc_total': depreciacao_totais.get('vlc_total', 0),
             'valor_residual_total': depreciacao_totais.get('valor_residual_total', 0),
-            'depreciacao_acumulada_total': depreciacao_totais.get('depreciacao_acumulada_total', 0)
+            'depreciacao_acumulada_total': depreciacao_totais.get('depreciacao_acumulada_total', 0),
+            'total_gastos_manutencao': total_gastos_manutencao
         })
     except Exception as e:
         return response(False, message=str(e), status_code=500)
@@ -2512,31 +2546,27 @@ def criar_usuario(username, password):
     except Exception as e:
         print(f'Erro ao criar usuário: {e}')
 
-# ============================================================================
-# Pedidos-Compra
-# ============================================================================
-
-@app.route('/pedidos-compra', methods=['GET'])
+# ============================================================
+# PEDIDOS DE COMPRA (multi-item)
+# ============================================================
+@app.route('/pedidos', methods=['GET'])
 @jwt_required()
-def listar_pedidos_compra():
+def listar_pedidos():
     try:
         status = request.args.get('status')
         base_sql = '''
-            SELECT pc.*, p.nome as produto_nome, p.codigo_fabricante, p.codigo_interno,
-                   COALESCE(e.saldo, 0) as saldo_atual
-            FROM pedidos_compra pc
-            LEFT JOIN produtos p ON pc.produto_id = p.id
-            LEFT JOIN (
-                SELECT produto_id, SUM(quantidade) as saldo
-                FROM estoque
-                GROUP BY produto_id
-            ) e ON p.id = e.produto_id
+            SELECT p.*,
+                   COUNT(pi.id) as total_itens,
+                   SUM(pi.quantidade_solicitada - COALESCE(pi.quantidade_transferida, 0)) as qtd_total,
+                   SUM(COALESCE(pi.quantidade_transferida, 0)) as qtd_transferida,
+                   COALESCE(SUM(pi.preco_unitario * (pi.quantidade_solicitada - COALESCE(pi.quantidade_transferida, 0))), 0) as valor_total
+            FROM pedidos p
+            LEFT JOIN pedidos_itens pi ON p.id = pi.pedido_id
         '''
         if status:
-            sql = base_sql + " WHERE pc.status = ? ORDER BY CASE pc.status WHEN 'aberto' THEN 1 WHEN 'em_compra' THEN 2 WHEN 'comprado' THEN 3 ELSE 4 END, pc.created_at DESC"
+            sql = base_sql + " WHERE p.status = ? GROUP BY p.id ORDER BY CASE p.status WHEN 'aberto' THEN 1 WHEN 'em_compra' THEN 2 WHEN 'comprado' THEN 3 WHEN 'recebido' THEN 4 ELSE 5 END, p.created_at DESC"
         else:
-            sql = base_sql + " ORDER BY CASE pc.status WHEN 'aberto' THEN 1 WHEN 'em_compra' THEN 2 WHEN 'comprado' THEN 3 ELSE 4 END, pc.created_at DESC"
-
+            sql = base_sql + " GROUP BY p.id ORDER BY CASE p.status WHEN 'aberto' THEN 1 WHEN 'em_compra' THEN 2 WHEN 'comprado' THEN 3 WHEN 'recebido' THEN 4 ELSE 5 END, p.created_at DESC"
         with get_connection() as conn:
             if status:
                 rows = conn.execute(sql, (status,)).fetchall()
@@ -2546,111 +2576,390 @@ def listar_pedidos_compra():
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
-
-@app.route('/pedidos-compra', methods=['POST'])
+@app.route('/pedidos/<int:id>', methods=['GET'])
 @jwt_required()
-def criar_pedido_compra():
+def obter_pedido(id):
     try:
-        data = request.get_json(silent=True) or {}
-        produto_id = data.get('produto_id')
-        quantidade_solicitada = data.get('quantidade_solicitada')
-        fornecedor = data.get('fornecedor')
-        preco_unitario = data.get('preco_unitario')
-        observacao = data.get('observacao')
-        data_prevista_chegada = data.get('data_prevista_chegada')
-        solicitante = data.get('solicitante')
-
-        if produto_id is None or quantidade_solicitada is None:
-            return response(False, message='produto_id e quantidade_solicitada são obrigatórios.', status_code=400)
-
         with get_connection() as conn:
-            existing = conn.execute(
-                'SELECT id FROM pedidos_compra WHERE produto_id = ? AND status IN (\'aberto\', \'em_compra\')',
-                (produto_id,)
-            ).fetchone()
-            if existing:
-                return response(False, message='Já existe um pedido de compra aberto ou em compra para este produto.', status_code=409)
-
-            conn.execute('''
-                INSERT INTO pedidos_compra
-                    (produto_id, quantidade_solicitada, status, fornecedor, preco_unitario, observacao,
-                     data_prevista_chegada, solicitante, data_pedido, created_at, updated_at)
-                VALUES (?, ?, 'aberto', ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (produto_id, quantidade_solicitada, fornecedor, preco_unitario, observacao,
-                  data_prevista_chegada, solicitante, now_iso(), now_iso(), now_iso()))
-
-            current_user = get_jwt_identity()
-            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-            registrar_log(
-                user['id'], current_user, 'criar', 'pedidos_compra',
-                f'Criou pedido de compra para produto ID {produto_id}, quantidade {quantidade_solicitada}',
-                conn=conn
-            )
-            conn.commit()
-        return response(True, message='Pedido de compra criado com sucesso.')
+            pedido = conn.execute('''
+                SELECT p.*,
+                       COUNT(pi.id) as total_itens,
+                       SUM(pi.quantidade_solicitada) as qtd_total,
+                       COALESCE(SUM(pi.preco_unitario * pi.quantidade_solicitada), 0) as valor_total
+                FROM pedidos p
+                LEFT JOIN pedidos_itens pi ON p.id = pi.pedido_id
+                WHERE p.id = ?
+                GROUP BY p.id
+            ''', (id,)).fetchone()
+            if not pedido:
+                return response(False, message='Pedido não encontrado.', status_code=404)
+            itens = conn.execute('''
+                SELECT pi.*, pr.nome as produto_nome, pr.codigo_fabricante, pr.codigo_interno,
+                       (pi.quantidade_solicitada - COALESCE(pi.quantidade_transferida, 0)) as saldo
+                FROM pedidos_itens pi
+                LEFT JOIN produtos pr ON pi.produto_id = pr.id
+                WHERE pi.pedido_id = ?
+            ''', (id,)).fetchall()
+            result = dict(pedido)
+            result['itens'] = rows_to_dict(itens)
+        return response(True, data=result)
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
-
-@app.route('/pedidos-compra/<int:id>', methods=['PUT'])
+@app.route('/pedidos', methods=['POST'])
 @jwt_required()
-def atualizar_pedido_compra(id):
+def criar_pedido():
+    try:
+        data = request.get_json(silent=True) or {}
+        fornecedor = data.get('fornecedor')
+        solicitante = data.get('solicitante')
+        observacao = data.get('observacao')
+        itens = data.get('itens', [])
+        if not itens:
+            return response(False, message='É necessário informar pelo menos 1 item.', status_code=400)
+        current_user = get_jwt_identity()
+        with get_connection() as conn:
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            conn.execute('''
+                INSERT INTO pedidos
+                    (fornecedor, solicitante, observacao, status, data_abertura, data_pedido, created_at, updated_at)
+                VALUES (?, ?, ?, 'aberto', ?, ?, ?, ?)
+            ''', (fornecedor, solicitante, observacao, now_iso(), now_iso(), now_iso(), now_iso()))
+            pedido_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+            for item in itens:
+                conn.execute('''
+                    INSERT INTO pedidos_itens (pedido_id, produto_id, quantidade_solicitada, preco_unitario)
+                    VALUES (?, ?, ?, ?)
+                ''', (pedido_id, item['produto_id'], item['quantidade_solicitada'], item.get('preco_unitario')))
+            registrar_log(
+                user['id'], current_user, 'criar', 'pedidos',
+                f'Criou pedido #{pedido_id} com {len(itens)} item(ns)',
+                conn=conn
+            )
+            conn.commit()
+        return response(True, data={'id': pedido_id}, message='Pedido criado com sucesso.')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/pedidos/<int:id>', methods=['PUT'])
+@jwt_required()
+def atualizar_pedido(id):
+    try:
+        data = request.get_json(silent=True) or {}
+        with get_connection() as conn:
+            existente = conn.execute('SELECT id FROM pedidos WHERE id = ?', (id,)).fetchone()
+            if not existente:
+                return response(False, message='Pedido não encontrado.', status_code=404)
+            campos_pedido = ['fornecedor', 'solicitante', 'observacao']
+            valores = {c: data[c] for c in campos_pedido if c in data}
+            if data.get('status'):
+                valores['status'] = data['status']
+                # Atualiza timestamp do status
+                if data['status'] == 'em_compra':
+                    valores['data_em_compra'] = now_iso()
+                elif data['status'] == 'comprado':
+                    valores['data_comprado'] = now_iso()
+                elif data['status'] == 'recebido':
+                    valores['data_recebido'] = now_iso()
+            if valores:
+                valores['updated_at'] = now_iso()
+                set_clause = ', '.join([f'{c} = ?' for c in valores.keys()])
+                params = tuple(valores.values()) + (id,)
+                conn.execute(f'UPDATE pedidos SET {set_clause} WHERE id = ?', params)
+            # Se veio lista de itens, substitui
+            if data.get('itens') is not None:
+                conn.execute('DELETE FROM pedidos_itens WHERE pedido_id = ?', (id,))
+                for item in data['itens']:
+                    conn.execute('''
+                        INSERT INTO pedidos_itens (pedido_id, produto_id, quantidade_solicitada, preco_unitario)
+                        VALUES (?, ?, ?, ?)
+                    ''', (id, item['produto_id'], item['quantidade_solicitada'], item.get('preco_unitario')))
+            current_user = get_jwt_identity()
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            registrar_log(
+                user['id'], current_user, 'atualizar', 'pedidos',
+                f'Atualizou pedido #{id}',
+                conn=conn
+            )
+            conn.commit()
+        return response(True, message='Pedido atualizado com sucesso.')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/pedidos/<int:id>', methods=['DELETE'])
+@jwt_required()
+@perfil_required('admin', 'operador')
+def deletar_pedido(id):
+    try:
+        with get_connection() as conn:
+            cur = conn.execute('DELETE FROM pedidos WHERE id = ?', (id,))
+            if cur.rowcount == 0:
+                return response(False, message='Pedido não encontrado.', status_code=404)
+            current_user = get_jwt_identity()
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            registrar_log(
+                user['id'], current_user, 'deletar', 'pedidos',
+                f'Deletou pedido #{id}',
+                conn=conn
+            )
+            conn.commit()
+        return response(True, message='Pedido excluído com sucesso.')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/pedidos/<int:id>/transferir', methods=['POST'])
+@jwt_required()
+@perfil_required('admin', 'operador')
+def transferir_itens_pedido(id):
+    try:
+        data = request.get_json(silent=True) or {}
+        itens = data.get('itens', [])
+
+        if not itens:
+            return response(False, message='Nenhum item informado para transferência.', status_code=400)
+
+        current_user = get_jwt_identity()
+
+        with get_connection() as conn:
+            # Validar pedido
+            pedido = conn.execute('SELECT id, status FROM pedidos WHERE id = ?', (id,)).fetchone()
+            if not pedido:
+                return response(False, message='Pedido não encontrado.', status_code=404)
+            if pedido['status'] != 'aberto':
+                return response(False, message='Apenas pedidos em aberto podem ter itens transferidos.', status_code=400)
+
+            # Buscar itens do pedido
+            itens_pedido = {
+                row['produto_id']: dict(row)
+                for row in conn.execute(
+                    '''SELECT pi.*, pr.nome as produto_nome
+                       FROM pedidos_itens pi
+                       JOIN produtos pr ON pi.produto_id = pr.id
+                       WHERE pi.pedido_id = ?''', (id,)
+                ).fetchall()
+            }
+
+            transferencias_criadas = []
+
+            for item in itens:
+                produto_id = item.get('produto_id')
+                quantidade = item.get('quantidade', 0)
+                origem_id = item.get('almoxarifado_origem_id')
+                destino_id = item.get('almoxarifado_destino_id')
+
+                if not all([produto_id, quantidade, origem_id, destino_id]):
+                    return response(False, message='Cada item deve ter: produto_id, quantidade, almoxarifado_origem_id, almoxarifado_destino_id.', status_code=400)
+
+                try:
+                    quantidade = int(quantidade)
+                except (TypeError, ValueError):
+                    return response(False, message=f'Quantidade inválida para produto {produto_id}.', status_code=400)
+
+                if quantidade <= 0:
+                    return response(False, message=f'Quantidade deve ser maior que zero.', status_code=400)
+
+                if origem_id == destino_id:
+                    return response(False, message=f'Origem e destino devem ser diferentes.', status_code=400)
+
+                # Validar que o item pertence ao pedido
+                if produto_id not in itens_pedido:
+                    return response(False, message=f'Produto {produto_id} não pertence a este pedido.', status_code=400)
+
+                pi = itens_pedido[produto_id]
+                qtd_transferida = pi.get('quantidade_transferida', 0) or 0
+                saldo_disponivel = pi['quantidade_solicitada'] - qtd_transferida
+
+                if quantidade > saldo_disponivel:
+                    return response(False,
+                        message=f'{pi["produto_nome"]}: transferência excede saldo disponível ({saldo_disponivel}).',
+                        status_code=400)
+
+                # Validar almoxarifados
+                origem = conn.execute('SELECT id, nome FROM almoxarifados WHERE id = ?', (origem_id,)).fetchone()
+                if not origem:
+                    return response(False, message=f'Almoxarifado de origem não encontrado.', status_code=404)
+                destino = conn.execute('SELECT id, nome FROM almoxarifados WHERE id = ?', (destino_id,)).fetchone()
+                if not destino:
+                    return response(False, message=f'Almoxarifado de destino não encontrado.', status_code=404)
+
+                # Verificar saldo no estoque
+                saldo_row = conn.execute(
+                    'SELECT quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
+                    (produto_id, origem_id)
+                ).fetchone()
+                saldo_atual = saldo_row['quantidade'] if saldo_row else 0
+
+                if saldo_atual < quantidade:
+                    return response(False,
+                        message=f'Saldo insuficiente de {pi["produto_nome"]} em {origem["nome"]}.',
+                        status_code=409)
+
+                # 1. Dar baixa no estoque de origem
+                conn.execute(
+                    'UPDATE estoque SET quantidade = quantidade - ? WHERE produto_id = ? AND almoxarifado_id = ?',
+                    (quantidade, produto_id, origem_id)
+                )
+
+                # 2. Criar transferencia
+                conn.execute(
+                    '''INSERT INTO transferencias
+                       (produto_id, almoxarifado_origem_id, almoxarifado_destino_id,
+                        quantidade_total, quantidade_recebida, valor_unitario, status,
+                        documento, tecnico, ordem_servico, observacao, data_envio, enviado_por)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (produto_id, origem_id, destino_id,
+                     quantidade, 0, None, 'enviada',
+                     f'Pedido #{id}', None, None,
+                     f'Transferência automática do Pedido #{id}', now_iso(), current_user)
+                )
+
+                trow = conn.execute('SELECT id FROM transferencias ORDER BY id DESC LIMIT 1').fetchone()
+                transfer_id = trow['id']
+
+                # 3. Registrar movimentação de saída
+                conn.execute(
+                    '''INSERT INTO movimentacoes
+                       (produto_id, almoxarifado_id, colaborador_id, tipo, quantidade,
+                        valor_unitario, documento, tecnico, ordem_servico, observacao, data)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                    (produto_id, origem_id, None, 'saida', quantidade,
+                     None, f'Pedido #{id}', None, None,
+                     f'Transferência #{transfer_id} para {destino["nome"]} (Pedido #{id})', now_iso())
+                )
+
+                # 4. Atualizar quantidade_transferida no pedido
+                conn.execute(
+                    'UPDATE pedidos_itens SET quantidade_transferida = COALESCE(quantidade_transferida, 0) + ? WHERE id = ?',
+                    (quantidade, pi['id'])
+                )
+
+                transferencias_criadas.append({
+                    'transfer_id': transfer_id,
+                    'produto_id': produto_id,
+                    'produto_nome': pi['produto_nome'],
+                    'quantidade': quantidade,
+                    'origem': origem['nome'],
+                    'destino': destino['nome']
+                })
+
+            # Registrar log
+            user_row = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            user_id = user_row['id'] if user_row else None
+            registrar_log(user_id, current_user, 'transferir', 'pedidos',
+                f'Transferência de {len(transferencias_criadas)} itens do Pedido #{id}',
+                conn=conn)
+
+            # Verificar se todos os itens do pedido foram totalmente transferidos
+            restante = conn.execute('''
+                SELECT COUNT(*) as total,
+                       SUM(CASE WHEN COALESCE(quantidade_transferida, 0) < quantidade_solicitada THEN 1 ELSE 0 END) as pendentes
+                FROM pedidos_itens WHERE pedido_id = ?
+            ''', (id,)).fetchone()
+            if restante and restante['pendentes'] == 0:
+                conn.execute('UPDATE pedidos SET status = ?, data_recebido = ? WHERE id = ?',
+                             ('recebido', now_iso(), id))
+
+            conn.commit()
+
+        return response(True, data={
+            'transferencias': transferencias_criadas,
+            'total_itens': len(transferencias_criadas)
+        }, message=f'{len(transferencias_criadas)} itens transferidos com sucesso.')
+
+    except Exception:
+        import traceback; traceback.print_exc()
+        return response(False, message='Erro interno ao transferir itens do pedido.', status_code=500)
+
+@app.route('/pedidos/<int:id>/status', methods=['PUT'])
+@jwt_required()
+def avancar_status_pedido(id):
     try:
         data = request.get_json(silent=True) or {}
         novo_status = data.get('status')
-
-        if novo_status == 'comprado' and not data.get('data_prevista_chegada'):
-            return response(False, message='data_prevista_chegada é obrigatória quando status é comprado.', status_code=400)
-
-        campos = ['produto_id', 'quantidade_solicitada', 'status', 'fornecedor', 'preco_unitario',
-                  'observacao', 'data_prevista_chegada', 'solicitante']
-        valores = {campo: data.get(campo) for campo in campos if campo in data}
-        valores['updated_at'] = now_iso()
-
-        set_clause = ', '.join([f'{campo} = ?' for campo in valores.keys()])
-        params = tuple(valores.values()) + (id,)
-
+        if novo_status not in ('em_compra', 'comprado', 'recebido'):
+            return response(False, message='Status inválido. Use: em_compra, comprado, recebido', status_code=400)
         with get_connection() as conn:
-            cur = conn.execute(f'UPDATE pedidos_compra SET {set_clause} WHERE id = ?', params)
-            if cur.rowcount == 0:
-                return response(False, message='Pedido de compra não encontrado.', status_code=404)
+            pedido = conn.execute('SELECT id, status FROM pedidos WHERE id = ?', (id,)).fetchone()
+            if not pedido:
+                return response(False, message='Pedido não encontrado.', status_code=404)
 
-            current_user = get_jwt_identity()
-            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-            registrar_log(
-                user['id'], current_user, 'atualizar', 'pedidos_compra',
-                f'Atualizou pedido de compra ID {id}' + (f', novo status: {novo_status}' if novo_status else ''),
-                conn=conn
-            )
+            # Se for recebido, dar entrada no estoque
+            if novo_status == 'recebido':
+                almoxarifado_id = data.get('almoxarifado_id')
+                if not almoxarifado_id:
+                    return response(False, message='Informe o almoxarifado de destino.', status_code=400)
+
+                # Buscar itens do pedido
+                itens = conn.execute(
+                    'SELECT pi.produto_id, pi.quantidade_solicitada FROM pedidos_itens pi WHERE pi.pedido_id = ?',
+                    (id,)
+                ).fetchall()
+
+                if not itens:
+                    return response(False, message='Pedido sem itens para dar entrada.', status_code=400)
+
+                for item in itens:
+                    produto_id = item['produto_id']
+                    qtd = item['quantidade_solicitada']
+
+                    # Verificar se já existe registro de estoque para este produto+almoxarifado
+                    existente = conn.execute(
+                        'SELECT id, quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
+                        (produto_id, almoxarifado_id)
+                    ).fetchone()
+
+                    if existente:
+                        conn.execute(
+                            'UPDATE estoque SET quantidade = quantidade + ?, updated_at = ? WHERE id = ?',
+                            (qtd, now_iso(), existente['id'])
+                        )
+                    else:
+                        conn.execute(
+                            'INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at) VALUES (?, ?, ?, 0, ?)',
+                            (produto_id, almoxarifado_id, qtd, now_iso())
+                        )
+
+                    # Registrar movimentação de entrada
+                    conn.execute('''
+                        INSERT INTO movimentacoes
+                            (produto_id, almoxarifado_id, tipo, quantidade,
+                             valor_unitario, documento, observacao)
+                        VALUES (?, ?, 'entrada', ?, 0, ?, ?)
+                    ''', (produto_id, almoxarifado_id, qtd,
+                          f'Recebimento Pedido #{id}',
+                          f'Entrada por recebimento de Pedido #{id}'))
+
+                current_user = get_jwt_identity()
+                user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+                registrar_log(
+                    user['id'], current_user, 'receber', 'pedidos',
+                    f'Pedido #{id} recebido no almoxarifado #{almoxarifado_id} com {len(itens)} itens',
+                    conn=conn
+                )
+
+            # Mapa de timestamps
+            ts_map = {
+                'em_compra': 'data_em_compra',
+                'comprado': 'data_comprado',
+                'recebido': 'data_recebido'
+            }
+            coluna_ts = ts_map[novo_status]
+            conn.execute(f'UPDATE pedidos SET status = ?, {coluna_ts} = ?, updated_at = ? WHERE id = ?',
+                         (novo_status, now_iso(), now_iso(), id))
+
+            if novo_status != 'recebido':
+                current_user = get_jwt_identity()
+                user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+                registrar_log(
+                    user['id'], current_user, 'atualizar', 'pedidos',
+                    f'Pedido #{id} alterado para {novo_status}',
+                    conn=conn
+                )
+
             conn.commit()
-        return response(True, message='Pedido de compra atualizado com sucesso.')
+        return response(True, message=f'Pedido alterado para "{novo_status}".')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
-
-
-@app.route('/pedidos-compra/<int:id>', methods=['DELETE'])
-@jwt_required()
-@perfil_required('admin', 'operador')
-def deletar_pedido_compra(id):
-    try:
-        with get_connection() as conn:
-            cur = conn.execute('DELETE FROM pedidos_compra WHERE id = ?', (id,))
-            if cur.rowcount == 0:
-                return response(False, message='Pedido de compra não encontrado.', status_code=404)
-
-            current_user = get_jwt_identity()
-            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-            registrar_log(
-                user['id'], current_user, 'deletar', 'pedidos_compra',
-                f'Deletou pedido de compra ID {id}',
-                conn=conn
-            )
-            conn.commit()
-        return response(True, message='Pedido de compra deletado com sucesso.')
-    except Exception as e:
-        return response(False, message=str(e), status_code=500)
-
-
 # ============================================================
 # TRANSFERENCIAS
 # ============================================================

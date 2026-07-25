@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 body { margin: 0; padding: 0; background: #f5f6fa; color: #333; font-size: 13px; }
 .container { max-width: none; margin: 0 auto; padding: 20px; }
 .hidden { display: none !important; }
-.card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+.card { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; overflow-x: auto; }
 h1, h2, h3 { margin-top: 0; color: #2c3e50; }
 h1 { font-size: 18px; }
 h2 { font-size: 18px; }
@@ -58,10 +58,13 @@ button:hover { background: #1f6691; }
 
 /* Tabelas */
 table { width: 100%; border-collapse: collapse; margin-top: 08px; }
+.card table { table-layout: fixed; }
+td { word-wrap: break-word; overflow-wrap: break-word; }
 th, td { padding: 4px 6px; border: 1px solid #ddd; text-align: left; font-size: 11px; line-height: 1.3; }
 th { background: #34495e; color: #fff; font-size: 12px; }
 tr:nth-child(even) { background: #f9f9f9; }
 .danger-row { background: #f8d7da !important; color: #721c24; }
+td { word-wrap: break-word; overflow-wrap: break-word; }
 
 /* Badges */
 .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: #fff; }
@@ -135,7 +138,22 @@ th, td {
 .tab-content table th:nth-child(9), .tab-content table td:nth-child(9) { white-space: nowrap; text-align: right; } /* Valor */
 .tab-content table th:nth-child(10), .tab-content table td:nth-child(10) { white-space: nowrap; text-align: center; } /* Ações */
 
-    </style>
+/* Dropdown Ações */
+.dropdown-acoes { position: relative; display: inline-block; }
+.dropdown-btn { padding: 4px 10px; background: #34495e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap; }
+.dropdown-btn:hover { background: #2c3e50; }
+.dropdown-menu { display: none; position: absolute; right: 0; top: 100%; background: #fff; min-width: 170px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 6px; z-index: 1000; padding: 4px; border: 1px solid #e5e7eb; }
+.dropdown-menu.show { display: block; }
+.dropdown-menu button { display: block; width: 100%; padding: 8px 12px; background: none; border: none; text-align: left; cursor: pointer; font-size: 12px; border-radius: 4px; color: #333; white-space: nowrap; }
+.dropdown-menu button:hover { background: #f3f4f6; }
+.dropdown-menu button.danger { color: #dc2626; }
+.dropdown-menu button.danger:hover { background: #fef2f2; }
+
+/* Modal */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.modal { background: #fff; border-radius: 12px; padding: 28px; width: 90%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+
+</style>
 </head>
 
 <!-- Modal Importar Estoque -->
@@ -300,15 +318,15 @@ th, td {
         <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
             <table>
                 <thead>
-                    <tr>
-                        <th>Cód. Interno</th>
-                        <th>Nome</th>
-                        <th>Rastreab.</th>
-                        <th>Estoque Minimo</th>
-                        <th>Unidade</th>
-                        <th style="text-align: center;">Sobr.</th>    
-                        <th style="text-align: center;">Ações</th>
-                    </tr>
+                        <tr>
+                            <th style="width:80px; min-width:80px;">Cód. Interno</th>
+                            <th style="width:200px; min-width:200px;">Nome</th>
+                            <th style="width:80px; min-width:80px;">Rastreab.</th>
+                            <th style="width:100px; min-width:100px;">Estoque Minimo</th>
+                            <th style="width:70px; min-width:70px;">Unidade</th>
+                            <th style="width:60px; min-width:60px; text-align: center;">Sobr.</th>    
+                            <th style="width:70px; min-width:70px; text-align: center;">Ações</th>
+                        </tr>
                 </thead>
                 <tbody id="produtosTableBody"></tbody>
             </table>
@@ -431,16 +449,16 @@ th, td {
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Produto</th>
-                    <th>Origem</th>
-                    <th>Destino</th>
-                    <th>Qtd Total</th>
-                    <th>Recebida</th>
-                    <th>Pendente</th>
-                    <th>Status</th>
-                    <th>Data Envio</th>
-                    <th>Ações</th>
+                    <th style="width:50px; min-width:50px;">ID</th>
+                    <th style="width:150px; min-width:150px;">Produto</th>
+                    <th style="width:120px; min-width:120px;">Origem</th>
+                    <th style="width:120px; min-width:120px;">Destino</th>
+                    <th style="width:60px; min-width:60px;">Qtd Total</th>
+                    <th style="width:65px; min-width:65px;">Recebida</th>
+                    <th style="width:65px; min-width:65px;">Pendente</th>
+                    <th style="width:80px; min-width:80px;">Status</th>
+                    <th style="width:85px; min-width:85px;">Data Envio</th>
+                    <th style="width:70px; min-width:70px;">Ações</th>
                 </tr>
             </thead>
             <tbody id="tabela-transferencias"></tbody>
@@ -460,18 +478,18 @@ th, td {
             <table>
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Produto</th>
-                        <th>Código Inteno</th>
-                        <th>Almoxarifado</th>
-                        <th>Tipo</th>
-                        <th>Qtd</th>
-                        <th>Valor Unit.</th>
-                        <th>Valor Total</th>
-                        <th>Documento</th>
-                        <th>Técnico</th>
-                        <th>TAG</th>
-                        <th>Data</th>
+                        <th style="width:30px; min-width:30px;">ID</th>
+                        <th style="width:130px; min-width:130px;">Produto</th>
+                        <th style="width:80px; min-width:80px;">Código Interno</th>
+                        <th style="width:110px; min-width:110px;">Almoxarifado</th>
+                        <th style="width:70px; min-width:70px;">Tipo</th>
+                        <th style="width:40px; min-width:40px;">Qtd</th>
+                        <th style="width:60px; min-width:60px;">Valor Unit.</th>
+                        <th style="width:70px; min-width:70px;">Valor Total</th>
+                        <th style="width:100px; min-width:100px;">Documento</th>
+                        <th style="width:80px; min-width:80px;">Técnico</th>
+                        <th style="width:60px; min-width:60px;">TAG</th>
+                        <th style="width:80px; min-width:80px;">Data</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-movimentacoes"></tbody>
@@ -498,23 +516,25 @@ th, td {
             </div>
         </div>
         <div id="relatorio-message"></div>
+        <div style="overflow-x: auto;">
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Código Fabricante</th>
-                    <th>Descrição</th>
-                    <th>Saldo Atual</th>
-                    <th>Estoque Mínimo</th>
-                    <th>Diferença</th>
-                    <th>Status</th>
-                    <th>Compra</th>
+                    <th style="width:40px; min-width:40px;">ID</th>
+                    <th style="width:100px; min-width:100px;">Cód. Fabricante</th>
+                    <th style="width:200px; min-width:200px;">Descrição</th>
+                    <th style="width:70px; min-width:70px;">Saldo Atual</th>
+                    <th style="width:80px; min-width:80px;">Est. Mínimo</th>
+                    <th style="width:65px; min-width:65px;">Diferença</th>
+                    <th style="width:80px; min-width:80px;">Status</th>
+                    <th style="width:70px; min-width:70px;">Compra</th>
                 </tr>
             </thead>
             <tbody id="tabela-relatorios">
                 <tr><td colspan="7" style="text-align:center;color:#999;">Selecione um filtro acima para gerar o relatório</td></tr>
             </tbody>
         </table>
+        </div>
     </div>
 </div>  
 
@@ -581,6 +601,14 @@ th, td {
                     </div>
                 </div>
 
+                <!-- Linha 3: Localização -->
+                <div class="form-group" style="margin-top: 12px;">
+                    <label>Localização</label>
+                    <select id="unidade_localizacao" style="width: 100%;">
+                        <option value="">Selecione o almoxarifado</option>
+                    </select>
+                </div>
+
                 <!-- Botões -->
                 <div style="display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
                     <button type="button" class="btn-primary" style="min-width: 140px;" onclick="salvarUnidade()">Salvar Unidade</button>
@@ -609,11 +637,12 @@ th, td {
                     <table>
                         <thead>
                             <tr>
-                                <th>Produto</th>
-                                <th>TAG</th>
-                                <th>Nº Série</th>
-                                <th>Status</th>
-                                <th style="text-align: center;">Ações</th>
+                                <th style="width:120px; min-width:120px;">Produto</th>
+                                <th style="width:80px; min-width:80px;">TAG</th>
+                                <th style="width:110px; min-width:110px;">Nº Série</th>
+                                <th style="width:80px; min-width:80px;">Status</th>
+                                <th style="width:120px; min-width:120px;">Localização</th>
+                                <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-unidades-body">
@@ -683,11 +712,11 @@ th, td {
                     <table>
                         <thead>
                             <tr>
-                                <th>TAG</th>
-                                <th>Produto</th>
-                                <th>Colaborador</th>
-                                <th>Data</th>
-                                <th>Status</th>
+                                <th style="width:80px; min-width:80px;">TAG</th>
+                                <th style="width:150px; min-width:150px;">Produto</th>
+                                <th style="width:130px; min-width:130px;">Colaborador</th>
+                                <th style="width:85px; min-width:85px;">Data</th>
+                                <th style="width:70px; min-width:70px;">Status</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-emprestimos-body">
@@ -789,13 +818,13 @@ th, td {
                 <table>
                     <thead>
                         <tr>
-                            <th>Nome</th>
-                            <th>Matrícula</th>
-                            <th>Telefone</th>
-                            <th>E-mail</th>
-                            <th>Setor</th>
-                            <th>Função</th>
-                            <th style="text-align: center;">Ações</th>
+                            <th style="width:140px; min-width:140px;">Nome</th>
+                            <th style="width:80px; min-width:80px;">Matrícula</th>
+                            <th style="width:110px; min-width:110px;">Telefone</th>
+                            <th style="width:180px; min-width:180px;">E-mail</th>
+                            <th style="width:100px; min-width:100px;">Setor</th>
+                            <th style="width:100px; min-width:100px;">Função</th>
+                            <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-colaboradores">
@@ -891,11 +920,11 @@ th, td {
                 <table>
                     <thead>
                         <tr>
-                            <th>Nome</th>
-                            <th>E-mail</th>
-                            <th>Perfil</th>
-                            <th>Status</th>
-                            <th style="text-align: center;">Ações</th>
+                            <th style="width:140px; min-width:140px;">Nome</th>
+                            <th style="width:200px; min-width:200px;">E-mail</th>
+                            <th style="width:70px; min-width:70px;">Perfil</th>
+                            <th style="width:70px; min-width:70px;">Status</th>
+                            <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="usuariosTableBody">
@@ -931,9 +960,19 @@ th, td {
         <!-- Cards de Resumo -->
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
             <div style="background: linear-gradient(135deg, #ecfdf5, #d1fae5); border: 1px solid #a7f3d0; border-radius: 12px; padding: 20px;">
-                <div style="font-size: 13px; color: #059669; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Gastos Totais</div>
-                <div style="font-size: 28px; font-weight: 700; color: #065f46; margin-top: 8px;" id="dash-card-gastos">`R$ 0,00`</div>
-                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">No período selecionado</div>
+                <div style="font-size: 13px; color: #059669; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🟢 Consumíveis</div>
+                <div style="font-size: 28px; font-weight: 700; color: #065f46; margin-top: 8px;" id="dash-card-consumiveis">R$ 0,00</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Saídas de materiais de consumo</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #eef2ff, #e0e7ff); border: 1px solid #c7d2fe; border-radius: 12px; padding: 20px;">
+                <div style="font-size: 13px; color: #4f46e5; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🔵 Depreciação (VLC)</div>
+                <div style="font-size: 28px; font-weight: 700; color: #3730a3; margin-top: 8px;" id="dash-card-depreciacao">R$ 0,00</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Valor líquido contábil dos ativos</div>
+            </div>
+            <div style="background: linear-gradient(135deg, #fff7ed, #ffedd5); border: 1px solid #fed7aa; border-radius: 12px; padding: 20px;">
+                <div style="font-size: 13px; color: #ea580c; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">🟠 Manutenção</div>
+                <div style="font-size: 28px; font-weight: 700; color: #9a3412; margin-top: 8px;" id="dash-card-manutencao-custo">R$ 0,00</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Custos com manutenção de unidades</div>
             </div>
             <div style="background: linear-gradient(135deg, #fffbeb, #fef3c7); border: 1px solid #fde68a; border-radius: 12px; padding: 20px;">
                 <div style="font-size: 13px; color: #d97706; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Estoque Baixo/Crítico</div>
@@ -961,9 +1000,9 @@ th, td {
                     <table>
                         <thead>
                             <tr>
-                                <th>Colaborador</th>
-                                <th>Qtd. Retirada</th>
-                                <th>Valor</th>
+                                <th style="width:200px; min-width:200px;">Colaborador</th>
+                                <th style="width:100px; min-width:100px;">Qtd. Retirada</th>
+                                <th style="width:80px; min-width:80px;">Valor</th>
                             </tr>
                         </thead>
                         <tbody id="dash-tabela-consumidores">
@@ -984,9 +1023,9 @@ th, td {
                     <table>
                         <thead>
                             <tr>
-                                <th>Tipo</th>
-                                <th>Qtd. Itens</th>
-                                <th>Valor Total</th>
+                                <th style="width:200px; min-width:200px;">Tipo</th>
+                                <th style="width:90px; min-width:90px;">Qtd. Itens</th>
+                                <th style="width:80px; min-width:80px;">Valor Total</th>
                             </tr>
                         </thead>
                         <tbody id="dash-tabela-gastos-tipo">
@@ -1010,9 +1049,9 @@ th, td {
                     <table>
                         <thead>
                             <tr>
-                                <th>Equipamento</th>
-                                <th>Tipo</th>
-                                <th>Status</th>
+                                <th style="width:200px; min-width:200px;">Equipamento</th>
+                                <th style="width:100px; min-width:100px;">Tipo</th>
+                                <th style="width:80px; min-width:80px;">Status</th>
                             </tr>
                         </thead>
                         <tbody id="dash-tabela-manutencao">
@@ -1033,9 +1072,9 @@ th, td {
                     <table>
                         <thead>
                             <tr>
-                                <th>Equipamento</th>
-                                <th>Data Validade</th>
-                                <th>Dias Restantes</th>
+                                <th style="width:200px; min-width:200px;">Equipamento</th>
+                                <th style="width:110px; min-width:110px;">Data Validade</th>
+                                <th style="width:90px; min-width:90px;">Dias Restantes</th>
                             </tr>
                         </thead>
                         <tbody id="dash-tabela-calibracoes">
@@ -1056,67 +1095,70 @@ th, td {
 <div id="tab-pedidos" class="tab-content hidden">
     <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <h2>Pedidos de Compra</h2>
+            <h2>🛒 Pedidos de Compra</h2>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button onclick="loadPedidosCompra(null)">Todos</button>
-                <button onclick="loadPedidosCompra('aberto')" style="background:#e3f2fd;">Aberto</button>
-                <button onclick="loadPedidosCompra('em_compra')" style="background:#fff3e0;">Em Compra</button>
-                <button onclick="loadPedidosCompra('comprado')" style="background:#e8f5e9;">Comprado</button>
+                <button onclick="loadPedidos(null)">Todos</button>
+                <button onclick="loadPedidos('aberto')" style="background:#e3f2fd;">Aberto</button>
+                <button onclick="loadPedidos('em_compra')" style="background:#fff3e0;">Em Compra</button>
+                <button onclick="loadPedidos('comprado')" style="background:#e8f5e9;">Comprado</button>
+                <button onclick="loadPedidos('recebido')" style="background:#f3e5f5;">Recebido</button>
             </div>
         </div>
     </div>
-
     <div class="card">
         <h3>Novo / Editar Pedido</h3>
         <form id="form-pedido" onsubmit="salvarPedido(event)">
             <input type="hidden" id="pedido_id">
-
-            <div>
-                <label>Produto *</label>
-                <select id="pedido_produto" required>
-                    <option value="">Selecione...</option>
-                </select>
-            </div>
-
-            <div>
-                <label>Qtd Solicitada *</label>
-                <input type="number" id="quantidade_solicitada" min="1" required>
-            </div>
-
             <div>
                 <label>Fornecedor</label>
                 <input type="text" id="fornecedor">
             </div>
-
-            <div>
-                <label>Preço Unitário</label>
-                <input type="number" id="preco_unitario" step="0.01" min="0">
-            </div>
-
             <div>
                 <label>Solicitante</label>
                 <input type="text" id="solicitante">
             </div>
-
-            <div>
-                <label>Data Prevista de Chegada</label>
-                <input type="date" id="data_prevista_chegada">
-            </div>
-
-            <div>
-                <label>Status</label>
-                <select id="status_pedido">
-                    <option value="aberto">Aberto</option>
-                    <option value="em_compra">Em Compra</option>
-                    <option value="comprado">Comprado</option>
-                </select>
-            </div>
-
             <div style="grid-column:span 2;">
                 <label>Observação</label>
                 <textarea id="observacao" rows="2"></textarea>
             </div>
-
+            <div style="grid-column:span 2;border:1px solid #e0e0e0;border-radius:6px;padding:12px;background:#fafafa;">
+                <h4 style="margin:0 0 8px 0;">Itens do Pedido</h4>
+                <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+                    <div style="flex:2;min-width:180px;">
+                        <label>Produto *</label>
+                        <select id="item_produto">
+                            <option value="">Selecione...</option>
+                        </select>
+                    </div>
+                    <div style="flex:1;min-width:80px;">
+                        <label>Qtd *</label>
+                        <input type="number" id="item_qtd" min="1">
+                    </div>
+                    <div style="flex:1;min-width:100px;">
+                        <label>Preço Unit.</label>
+                        <input type="number" id="item_preco" step="0.01" min="0">
+                    </div>
+                    <button type="button" onclick="adicionarItem()" style="padding:6px 14px;background:#4caf50;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">+ Adicionar</button>
+                </div>
+                <div style="margin-top:8px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                        <thead>
+                            <tr style="background:#e0e0e0;">
+                                <th style="padding:4px 8px;text-align:left;">Produto</th>
+                                <th style="padding:4px 8px;text-align:center;">Qtd</th>
+                                <th style="padding:4px 8px;text-align:right;">Preço</th>
+                                <th style="padding:4px 8px;text-align:right;">Subtotal</th>
+                                <th style="padding:4px 8px;width:40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-itens-pedido"></tbody>
+                    </table>
+                    <div id="nenhum-item" style="text-align:center;color:#999;padding:8px;font-size:13px;">
+                        Nenhum item adicionado.
+                    </div>
+                </div>
+                <input type="hidden" id="itens_json">
+            </div>
             <div style="grid-column:span 2;display:flex;gap:8px;">
                 <button type="submit" id="btnSalvarPedido">Criar Pedido</button>
                 <button type="button" id="btnCancelarEdicao" onclick="cancelarEdicaoPedido()" style="display:none;">Cancelar</button>
@@ -1124,25 +1166,28 @@ th, td {
         </form>
         <div id="pedido-message"></div>
     </div>
-
     <div class="card">
+      <div style="overflow-x: auto;">  
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Produto</th>
-                    <th>Qtd</th>
-                    <th>Fornecedor</th>
-                    <th>Preço Unit.</th>
-                    <th>Status</th>
-                    <th>Solicitante</th>
-                    <th>Data Prevista</th>
-                    <th>Data Pedido</th>
-                    <th>Ações</th>
+                    <th style="width:40px; min-width:40px;">ID</th>
+                    <th style="width:120px; min-width:100px;">Fornecedor</th>
+                    <th style="width:50px; min-width:50px;">Itens</th>
+                    <th style="width:70px; min-width:70px;">Qtd Total</th>
+                    <th style="width:85px; min-width:85px;">Valor Total</th>
+                    <th style="width:70px; min-width:70px;">Status</th>
+                    <th style="width:80px; min-width:60px;">Solicitante</th>
+                    <th style="width:80px; min-width:70px;">Abertura</th>
+                    <th style="width:80px; min-width:70px;">Compra</th>
+                    <th style="width:85px; min-width:75px;">Comprado</th>
+                    <th style="width:85px; min-width:75px;">Recebido</th>
+                    <th style="width:90px; min-width:90px;">Ações</th>
                 </tr>
             </thead>
             <tbody id="tabela-pedidos"></tbody>
         </table>
+         </div>
     </div>
 </div>
 
@@ -1218,16 +1263,16 @@ th, td {
                 <table>
                     <thead>
                         <tr>
-                            <th>Código</th>
-                            <th>Produto</th>
-                            <th>Categoria</th>
-                            <th>Almoxarifado</th>
-                            <th>Qtd. Atual</th>
-                            <th>Est. Mínimo</th>
-                            <th>Status</th>
-                            <th>Custo Médio</th>
-                            <th>Valor Patrimonial</th>
-                            <th style="text-align: center;">Ações</th>
+                            <th style="width:70px; min-width:70px;">Código</th>
+                            <th style="width:150px; min-width:150px;">Produto</th>
+                            <th style="width:100px; min-width:100px;">Categoria</th>
+                            <th style="width:130px; min-width:130px;">Almoxarifado</th>
+                            <th style="width:70px; min-width:70px;">Qtd.</th>
+                            <th style="width:75px; min-width:75px;">Est. Mín.</th>
+                            <th style="width:90px; min-width:90px;">Status</th>
+                            <th style="width:90px; min-width:90px;">Custo Médio</th>
+                            <th style="width:110px; min-width:110px;">Valor Patrim.</th>
+                            <th style="width:70px; min-width:70px; text-align: center;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-estoque">
@@ -1321,12 +1366,12 @@ th, td {
                 <table>
                     <thead>
                         <tr>
-                            <th>Código</th>
-                            <th>Nome</th>
-                            <th>Responsável</th>
-                            <th>Localização</th>
-                            <th>Status</th>
-                            <th style="text-align: center;">Ações</th>
+                            <th style="width:70px; min-width:70px;">Código</th>
+                            <th style="width:150px; min-width:150px;">Nome</th>
+                            <th style="width:120px; min-width:120px;">Responsável</th>
+                            <th style="width:130px; min-width:130px;">Localização</th>
+                            <th style="width:70px; min-width:70px;">Status</th>
+                            <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="tabela-almoxarifados">
@@ -1351,11 +1396,11 @@ th, td {
             <table>
                 <thead>
                     <tr>
-                        <th>Data</th>
-                        <th>Usuário</th>
-                        <th>Ação</th>
-                        <th>Tabela</th>
-                        <th>Descrição</th>
+                        <th style="width:140px; min-width:140px;">Data</th>
+                        <th style="width:120px; min-width:120px;">Usuário</th>
+                        <th style="width:80px; min-width:80px;">Ação</th>
+                        <th style="width:80px; min-width:80px;">Tabela</th>
+                        <th style="width:250px; min-width:250px;">Descrição</th>
                     </tr>
                 </thead>
                 <tbody id="auditoriaTableBody"></tbody>
@@ -1609,11 +1654,17 @@ async function carregarDashboard() {
             return true;
         });
 
-        // ===== CARD: Gastos Totais =====
-        const gastos = movFiltradas
-            .filter(m => m.tipo === 'entrada' && m.valor_unitario)
-            .reduce((acc, m) => acc + (m.valor_unitario * m.quantidade), 0);
-        document.getElementById('dash-card-gastos').textContent = `R$ ${gastos.toFixed(2)}`;
+        // ===== CARDS: Consumíveis, Depreciação e Manutenção =====
+        try {
+            const resDash = await fetch(`${API_BASE}/dashboard`, { headers });
+            const dashData = await resDash.json();
+            const data = dashData.data || dashData;
+            document.getElementById('dash-card-consumiveis').textContent = `R$ ${(data.gastos_consumiveis || 0).toFixed(2)}`;
+            document.getElementById('dash-card-depreciacao').textContent = `R$ ${(data.vlc_total || 0).toFixed(2)}`;
+            document.getElementById('dash-card-manutencao-custo').textContent = `R$ ${(data.total_gastos_manutencao || 0).toFixed(2)}`;
+        } catch(e) {
+            console.error('Erro ao carregar cards do dashboard:', e);
+        }
 
         // ===== CARD: Estoque Baixo/Crítico =====
         const saldos = {};
@@ -2151,9 +2202,8 @@ function showTab(tabName) {
     }
 
     if (tabName === 'pedidos') {
+        loadPedidos(null);
         carregarProdutosParaPedido();
-        loadPedidosCompra(null);
-        return;
     }
 }
 
@@ -2212,7 +2262,7 @@ async function carregarEstoque() {
 
         dados.forEach((item, index) => {
             const quantidade = parseFloat(item.quantidade) || 0;
-            const estoqueMinimo = parseFloat(item.produto_estoque_minimo || item.estoque_minimo) || 0;
+            const estoqueMinimo = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
 
             let statusLabel = '', statusBg = '', statusCor = '';
             if (quantidade === 0) {
@@ -2283,7 +2333,7 @@ function renderizarEstoque(dados) {
     }
 
     dados.forEach(item => {
-        const status = obterStatusEstoque(item.quantidade, item.produto_estoque_minimo);
+        const status = obterStatusEstoque(item.quantidade, item.estoque_minimo || item.produto_estoque_minimo);
         const config = {
             normal: { cor: '#059669', bg: '#ecfdf5', label: 'Normal' },
             baixo: { cor: '#d97706', bg: '#fffbeb', label: 'Baixo' },
@@ -2298,7 +2348,7 @@ function renderizarEstoque(dados) {
             <td>${item.categoria || '—'}</td>
             <td>${item.almoxarifado_nome || '—'}</td>
             <td style="font-weight: 700; font-size: 16px;">${item.quantidade || 0}</td>
-            <td>${item.produto_estoque_minimo || 0}</td>
+            <td>${item.estoque_minimo || item.produto_estoque_minimo || 0}</td>
             <td>
                 <span style="display:inline-block;padding:3px 10px;border-radius:12px;
                     font-size:12px;font-weight:600;color:${config.cor};background:${config.bg};">
@@ -2319,7 +2369,7 @@ function atualizarCardsEstoque(dados) {
 
     dados.forEach(item => {
         const qtd = parseFloat(item.quantidade) || 0;
-        const estoqueMin = parseFloat(item.produto_estoque_minimo || item.estoque_minimo) || 0;
+        const estoqueMin = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
 
         if (qtd > 0) {
             totalProdutosEmEstoque++;
@@ -2363,26 +2413,20 @@ function limparFiltrosEstoque() {
 }
 
 async function editarEstoqueMinimo(index) {
-    // ✅ Pega os dados do cache — sem risco de syntax error
     const item = estoqueDadosCache[index];
     if (!item) return;
-
-    const produtoId = item.produto_id;
+    const estoqueId = item.id;
     const produtoNome = item.produto_nome || 'Produto';
-    const estoqueMinimoAtual = parseFloat(item.produto_estoque_minimo || item.estoque_minimo) || 0;
-
+    const estoqueMinimoAtual = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
     const novoValor = prompt(`Editar estoque mínimo de "${produtoNome}":`, estoqueMinimoAtual);
-
     if (novoValor === null) return;
-
     const valor = parseFloat(novoValor);
     if (isNaN(valor) || valor < 0) {
         showMessage('estoque-message', 'Valor inválido.', 'error');
         return;
     }
-
     try {
-        const res = await fetch(`${API_BASE}/produtos/${produtoId}`, {
+        const res = await fetch(`${API_BASE}/estoque/${estoqueId}/minimo`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -2390,11 +2434,9 @@ async function editarEstoqueMinimo(index) {
             },
             body: JSON.stringify({ estoque_minimo: valor })
         });
-
         if (res.status === 401 || res.status === 403) { logout(); return; }
-
         if (res.ok) {
-            showMessage('estoque-message', 'Estoque mínimo atualizado!', 'success');
+            showMessage('estoque-message', 'Estoque mínimo atualizado para este almoxarifado!', 'success');
             carregarEstoque();
         } else {
             const data = await res.json();
@@ -2408,23 +2450,18 @@ async function editarEstoqueMinimo(index) {
 async function editarEstoqueMinimo(index) {
     const item = estoqueDadosCache[index];
     if (!item) return;
-
-    const produtoId = item.produto_id;
+    const estoqueId = item.id;
     const produtoNome = item.produto_nome || 'Produto';
-    const estoqueMinimoAtual = parseFloat(item.produto_estoque_minimo || item.estoque_minimo) || 0;
-
+    const estoqueMinimoAtual = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
     const novoValor = prompt(`Editar estoque mínimo de "${produtoNome}":`, estoqueMinimoAtual);
-
     if (novoValor === null) return;
-
     const valor = parseFloat(novoValor);
     if (isNaN(valor) || valor < 0) {
         showMessage('estoque-message', 'Valor inválido.', 'error');
         return;
     }
-
     try {
-        const res = await fetch(`${API_BASE}/produtos/${produtoId}`, {
+        const res = await fetch(`${API_BASE}/estoque/${estoqueId}/minimo`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -2432,11 +2469,9 @@ async function editarEstoqueMinimo(index) {
             },
             body: JSON.stringify({ estoque_minimo: valor })
         });
-
         if (res.status === 401 || res.status === 403) { logout(); return; }
-
         if (res.ok) {
-            showMessage('estoque-message', 'Estoque mínimo atualizado!', 'success');
+            showMessage('estoque-message', 'Estoque mínimo atualizado para este almoxarifado!', 'success');
             carregarEstoque();
         } else {
             const data = await res.json();
@@ -3067,6 +3102,21 @@ async function excluirAlmoxarifado(id) {
     }
 }
 
+function carregarAlmoxarifadosLocalizacao() {
+    fetch(`${API_BASE}/almoxarifados`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    })
+        .then(res => res.json())
+        .then(data => {
+            const select = document.getElementById('unidade_localizacao');
+            select.innerHTML = '<option value="">Selecione o almoxarifado</option>';
+            (data.data || data || []).forEach(a => {
+                select.innerHTML += `<option value="${a.nome}">${a.nome}</option>`;
+            });
+        })
+        .catch(err => console.error('Erro ao carregar almoxarifados:', err));
+}
+
 // ===== MOVIMENTAÇÕES =====
 
 async function submitMovimentacao() {
@@ -3516,6 +3566,7 @@ async function loadAuditoria() {
 }
 
 function loadUnidades() {
+    carregarAlmoxarifadosLocalizacao();
     const token = localStorage.getItem('access_token');
     
     fetch(`${API_BASE}/unidades`, {
@@ -3527,7 +3578,7 @@ function loadUnidades() {
         
         if (!data.success || !data.data || data.data.length === 0) {
             tbody.innerHTML = `<tr>
-                <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">
+                <td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">
                     Nenhuma unidade cadastrada.
                 </td>
             </tr>`;
@@ -3540,6 +3591,7 @@ function loadUnidades() {
                 <td><strong>${u.tag || '-'}</strong></td>
                 <td>${u.numero_serie || '-'}</td>
                 <td>${renderStatusUnidade(u.status)}</td>
+                <td>${u.localizacao || '-'}</td>
                 <td style="text-align: center;">
                     <button class="btn-sm btn-primary" onclick="editarUnidade(${u.id})">✏️</button>
                     <button class="btn-sm btn-danger" onclick="excluirUnidade(${u.id})">🗑️</button>
@@ -3583,7 +3635,8 @@ function salvarUnidade() {
     }
 
     const token = localStorage.getItem('access_token');
-    const body = { produto_id: parseInt(produto_id), tag, numero_serie, status };
+    const localizacao = document.getElementById('unidade_localizacao').value.trim();
+    const body = { produto_id: parseInt(produto_id), tag, numero_serie, status, localizacao };
 
     const url = id
         ? `${API_BASE}/unidades/${id}`
@@ -3617,6 +3670,7 @@ function limparFormUnidade() {
     document.getElementById('unidadeId').value = '';
     document.getElementById('unidade_tag').value = '';
     document.getElementById('unidade_serie').value = '';
+    document.getElementById('unidade_localizacao').value = '';
     document.getElementById('unidade_produto_id').value = '';
     document.querySelector('input[name="unidade_status"][value="disponivel"]').checked = true;
 }
@@ -3636,6 +3690,7 @@ function editarUnidade(id) {
         document.getElementById('unidade_produto_id').value = unidade.produto_id;
         document.getElementById('unidade_tag').value = unidade.tag || '';
         document.getElementById('unidade_serie').value = unidade.numero_serie || '';
+        document.getElementById('unidade_localizacao').value = unidade.localizacao || '';
 
         const radio = document.querySelector(`input[name="unidade_status"][value="${unidade.status}"]`);
         if (radio) radio.checked = true;
@@ -4163,24 +4218,98 @@ function formatarData(isoString) {
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return '-';
     const pad = (n) => String(n).padStart(2, '0');
-    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
 function statusPedidoBadge(status) {
     const s = (status || '').toLowerCase();
-    if (s === 'aberto')
-        return '<span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;">ABERTO</span>';
-    if (s === 'em_compra')
-        return '<span style="background:#fff3e0;color:#e65100;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;">EM COMPRA</span>';
-    if (s === 'comprado')
-        return '<span style="background:#e8f5e9;color:#2e7d32;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:bold;">COMPRADO</span>';
-    return status || '-';
+    const map = {
+        'aberto':    {bg:'#e3f2fd', color:'#1565c0', label:'ABERTO'},
+        'em_compra': {bg:'#fff3e0', color:'#e65100', label:'EM COMPRA'},
+        'comprado':  {bg:'#e8f5e9', color:'#2e7d32', label:'COMPRADO'},
+        'recebido':  {bg:'#f3e5f5', color:'#6a1b9a', label:'RECEBIDO'}
+    };
+    const m = map[s] || {bg:'#f5f5f5', color:'#666', label:status || '-'};
+    return `<span style="background:${m.bg};color:${m.color};padding:1px 6px;border-radius:10px;font-size:08px;font-weight:bold;">${m.label}</span>`;
 }
 
-async function loadPedidosCompra(statusFiltro) {
-    let url = `${API_BASE}/pedidos-compra`;
-    if (statusFiltro) url += `?status=${encodeURIComponent(statusFiltro)}`;
+// ============================================================
+// VARIÁVEL GLOBAL PARA ITENS DO FORMULÁRIO
+// ============================================================
+let itensFormulario = [];
 
+function adicionarItem() {
+    const select = document.getElementById('item_produto');
+    const produtoId = parseInt(select.value, 10);
+    const produtoNome = select.options[select.selectedIndex]?.text || 'Produto ' + produtoId;
+    const qtd = parseInt(document.getElementById('item_qtd').value, 10);
+    const preco = parseFloat(document.getElementById('item_preco').value) || null;
+    if (!produtoId || !qtd) { alert('Selecione um produto e informe a quantidade.'); return; }
+    itensFormulario.push({ produto_id: produtoId, produto_nome: produtoNome, quantidade_solicitada: qtd, preco_unitario: preco });
+    renderizarItensFormulario();
+    document.getElementById('item_produto').value = '';
+    document.getElementById('item_qtd').value = '';
+    document.getElementById('item_preco').value = '';
+}
+
+function removerItem(index) {
+    itensFormulario.splice(index, 1);
+    renderizarItensFormulario();
+}
+
+function renderizarItensFormulario(readonly) {
+    const tbody = document.getElementById('tabela-itens-pedido');
+    const empty = document.getElementById('nenhum-item');
+    tbody.innerHTML = '';
+    if (itensFormulario.length === 0) {
+        empty.style.display = 'block';
+        document.getElementById('itens_json').value = '[]';
+        return;
+    }
+    empty.style.display = 'none';
+    let totalGeral = 0;
+    itensFormulario.forEach((item, i) => {
+        const subtotal = item.quantidade_solicitada * (item.preco_unitario || 0);
+        totalGeral += subtotal;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="padding:4px 8px;">${item.produto_nome}</td>
+            <td style="padding:4px 8px;text-align:center;">${item.quantidade_solicitada}</td>
+            <td style="padding:4px 8px;text-align:right;">${item.preco_unitario != null ? 'R$ ' + item.preco_unitario.toFixed(2) : '-'}</td>
+            <td style="padding:4px 8px;text-align:right;">${item.preco_unitario != null ? 'R$ ' + subtotal.toFixed(2) : '-'}</td>
+            <td style="padding:4px 8px;text-align:center;">
+                ${readonly ? '' : '<button onclick="removerItem(' + i + ')" style="background:#f44336;color:#fff;border:none;border-radius:3px;cursor:pointer;padding:2px 6px;font-size:11px;">✕</button>'}
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+    // Linha de total
+    const trTotal = document.createElement('tr');
+    trTotal.innerHTML = `
+        <td colspan="3" style="padding:4px 8px;text-align:right;font-weight:bold;">Total Geral:</td>
+        <td style="padding:4px 8px;text-align:right;font-weight:bold;">R$ ${totalGeral.toFixed(2)}</td>
+        <td></td>
+    `;
+    tbody.appendChild(trTotal);
+    document.getElementById('itens_json').value = JSON.stringify(itensFormulario.map(i => ({
+        produto_id: i.produto_id,
+        quantidade_solicitada: i.quantidade_solicitada,
+        preco_unitario: i.preco_unitario
+    })));
+}
+
+function habilitarFormulario(enable) {
+    ['fornecedor','solicitante','observacao','item_produto','item_qtd','item_preco'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !enable;
+    });
+    const btnAdd = document.querySelector('#form-pedido button[onclick="adicionarItem()"]');
+    if (btnAdd) btnAdd.style.display = enable ? '' : 'none';
+}
+
+async function loadPedidos(statusFiltro) {
+    let url = API_BASE + '/pedidos';
+    if (statusFiltro) url += '?status=' + encodeURIComponent(statusFiltro);
     try {
         const res = await fetch(url, { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
@@ -4188,27 +4317,37 @@ async function loadPedidosCompra(statusFiltro) {
         const pedidos = data.data || data || [];
         const tbody = document.getElementById('tabela-pedidos');
         tbody.innerHTML = '';
-
         if (!pedidos.length) {
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;">Nenhum pedido encontrado</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:#999;">Nenhum pedido encontrado</td></tr>';
             return;
         }
-
         pedidos.forEach(p => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${p.id}</td>
-                <td>${p.produto_nome || '-'}</td>
-                <td>${p.quantidade_solicitada}</td>
                 <td>${p.fornecedor || '-'}</td>
-                <td>${p.preco_unitario != null ? Number(p.preco_unitario).toFixed(2) : '-'}</td>
+                <td style="text-align:center;">${p.total_itens || 0}</td>
+                <td style="text-align:center;">${p.qtd_total || 0}</td>
+                <td>R$ ${(p.valor_total || 0).toFixed(2)}</td>
                 <td>${statusPedidoBadge(p.status)}</td>
                 <td>${p.solicitante || '-'}</td>
-                <td>${p.status === 'comprado' && p.data_prevista_chegada ? formatarData(p.data_prevista_chegada) : '-'}</td>
-                <td>${formatarData(p.data_pedido)}</td>
-                <td style="white-space:nowrap;">
-                    <button onclick="editarPedido(${p.id})" style="padding:4px 8px;background:#1976d2;color:#fff;border:none;border-radius:3px;cursor:pointer;">Editar</button>
-                    <button onclick="excluirPedido(${p.id})" style="padding:4px 8px;background:#f44336;color:#fff;border:none;border-radius:3px;cursor:pointer;">Excluir</button>
+                <td>${formatarData(p.data_abertura)}</td>
+                <td>${p.data_em_compra ? formatarData(p.data_em_compra) : '-'}</td>
+                <td>${p.data_comprado ? formatarData(p.data_comprado) : '-'}</td>
+                <td>${p.data_recebido ? formatarData(p.data_recebido) : '-'}</td>
+                <td style="position:relative;">
+                    <div class="dropdown-acoes">
+                        <button class="dropdown-btn" onclick="event.stopPropagation();this.parentElement.querySelector('.dropdown-menu').classList.toggle('show')">⚙️ Ações ▾</button>
+                        <div class="dropdown-menu">
+                            ${p.status !== 'aberto' ? `<button onclick="visualizarPedido(${p.id})">👁️ Visualizar</button>` : ''}
+                            ${p.status === 'aberto' ? `<button onclick="editarPedido(${p.id})">✏️ Editar</button>` : ''}
+                            ${p.status === 'aberto' ? `<button onclick="avancarStatusPedido(${p.id},'em_compra')">🛒 Em Compra</button>` : ''}
+                            ${p.status === 'aberto' ? `<button onclick="transferirPedido(${p.id})">🔄 Transferir</button>` : ''}
+                            ${p.status === 'em_compra' ? `<button onclick="avancarStatusPedido(${p.id},'comprado')">✅ Comprado</button>` : ''}
+                            ${p.status === 'comprado' ? `<button onclick="avancarStatusPedido(${p.id},'recebido')">📦 Recebido</button>` : ''}
+                            ${p.status === 'aberto' || p.status === 'em_compra' ? `<button class="danger" onclick="excluirPedido(${p.id})">🗑️ Excluir</button>` : ''}
+                        </div>
+                    </div>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -4220,21 +4359,241 @@ async function loadPedidosCompra(statusFiltro) {
 
 async function carregarProdutosParaPedido() {
     try {
-        const res = await fetch(`${API_BASE}/produtos`, { headers: authHeaders() });
+        const res = await fetch(API_BASE + '/produtos', { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
         const data = await res.json();
         const produtos = data.data || data || [];
-        const select = document.getElementById('pedido_produto');
+        const select = document.getElementById('item_produto');
         select.innerHTML = '<option value="">Selecione...</option>';
+
+        // Mapa global para consulta de preço
+        window.produtosDataMap = {};
         produtos.forEach(p => {
+            window.produtosDataMap[p.id] = p;
+
             const opt = document.createElement('option');
             opt.value = p.id;
-            opt.textContent = p.nome;
+
+            // Indicador visual de estoque
+            let prefix = '';
+            if (p.saldo_total !== undefined) {
+                if (p.saldo_total <= 0) prefix = '🔴 ';
+                else if (p.estoque_minimo && p.saldo_total < p.estoque_minimo) prefix = '🟡 ';
+            }
+
+            const cod = (p.codigo_fabricante || p.codigo_interno || '');
+            opt.textContent = prefix + (cod ? '[' + cod + '] ' : '') + p.nome;
             select.appendChild(opt);
         });
+
+        // Auto-preenche o preço ao selecionar um produto
+        select.onchange = function() {
+            const id = parseInt(this.value, 10);
+            const campoPreco = document.getElementById('item_preco');
+            if (id && window.produtosDataMap[id]) {
+                const prod = window.produtosDataMap[id];
+                // Tenta custo_medio primeiro (valor real do estoque), depois preco, depois valor_unitario
+                if (prod.custo_medio != null && prod.custo_medio > 0) campoPreco.value = prod.custo_medio;
+                else if (prod.preco != null && prod.preco > 0) campoPreco.value = prod.preco;
+                else if (prod.valor_unitario != null && prod.valor_unitario > 0) campoPreco.value = prod.valor_unitario;
+                else campoPreco.value = '';
+            } else {
+                campoPreco.value = '';
+            }
+        };
     } catch (err) {
         showMessage('pedido-message', 'Erro ao carregar produtos: ' + err.message, 'error');
     }
+}
+
+async function editarPedido(id) {
+    try {
+        const res = await fetch(API_BASE + '/pedidos/' + id, { headers: authHeaders() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        const p = data.data;
+        if (!p) { showMessage('pedido-message', 'Pedido não encontrado', 'error'); return; }
+        document.getElementById('pedido_id').value = p.id;
+        document.getElementById('fornecedor').value = p.fornecedor || '';
+        document.getElementById('solicitante').value = p.solicitante || '';
+        document.getElementById('observacao').value = p.observacao || '';
+        await carregarProdutosParaPedido();
+        // Carrega itens
+        itensFormulario = (p.itens || []).map(item => ({
+            produto_id: item.produto_id,
+            produto_nome: item.produto_nome || 'Produto ' + item.produto_id,
+            quantidade_solicitada: item.saldo ?? (item.quantidade_solicitada - (item.quantidade_transferida || 0)),
+            preco_unitario: item.preco_unitario
+        }));
+        renderizarItensFormulario();
+        document.getElementById('btnSalvarPedido').textContent = 'Atualizar Pedido';
+        document.getElementById('btnCancelarEdicao').style.display = 'inline-block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+        showMessage('pedido-message', 'Erro ao editar: ' + err.message, 'error');
+    }
+}
+
+async function visualizarPedido(id) {
+    try {
+        const res = await fetch(API_BASE + '/pedidos/' + id, { headers: authHeaders() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        const p = data.data;
+        if (!p) { showMessage('pedido-message', 'Pedido não encontrado', 'error'); return; }
+        document.getElementById('pedido_id').value = p.id;
+        document.getElementById('fornecedor').value = p.fornecedor || '';
+        document.getElementById('solicitante').value = p.solicitante || '';
+        document.getElementById('observacao').value = p.observacao || '';
+        await carregarProdutosParaPedido();
+        itensFormulario = (p.itens || []).map(item => ({
+            produto_id: item.produto_id,
+            produto_nome: item.produto_nome || 'Produto ' + item.produto_id,
+            quantidade_solicitada: item.saldo ?? (item.quantidade_solicitada - (item.quantidade_transferida || 0)),
+            preco_unitario: item.preco_unitario
+        }));
+        renderizarItensFormulario(true);
+        habilitarFormulario(false);
+        document.getElementById('btnSalvarPedido').textContent = 'Fechar';
+        document.getElementById('btnSalvarPedido').onclick = function(e) {
+            e.preventDefault();
+            cancelarEdicaoPedido();
+        };
+        document.getElementById('btnCancelarEdicao').style.display = 'inline-block';
+        document.getElementById('btnCancelarEdicao').textContent = 'Fechar';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+        showMessage('pedido-message', 'Erro ao visualizar: ' + err.message, 'error');
+    }
+}
+
+async function salvarPedido(event) {
+    event.preventDefault();
+    const id = document.getElementById('pedido_id').value;
+    const itens = itensFormulario.map(i => ({
+        produto_id: i.produto_id,
+        quantidade_solicitada: i.quantidade_solicitada,
+        preco_unitario: i.preco_unitario
+    }));
+    const payload = {
+        fornecedor: document.getElementById('fornecedor').value,
+        solicitante: document.getElementById('solicitante').value,
+        observacao: document.getElementById('observacao').value,
+        itens: itens
+    };
+    if (!itens.length) {
+        showMessage('pedido-message', 'Adicione pelo menos 1 item ao pedido.', 'error');
+        return;
+    }
+    try {
+        const url = id ? API_BASE + '/pedidos/' + id : API_BASE + '/pedidos';
+        const method = id ? 'PUT' : 'POST';
+        const res = await fetch(url, { method, headers: authHeadersJSON(), body: JSON.stringify(payload) });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Erro ao salvar');
+        cancelarEdicaoPedido();
+        loadPedidos(null);
+        showMessage('pedido-message', id ? 'Pedido atualizado!' : 'Pedido criado!', 'success');
+    } catch (err) {
+        showMessage('pedido-message', 'Erro: ' + err.message, 'error');
+    }
+}
+
+async function excluirPedido(id) {
+    if (!confirm('Tem certeza que deseja excluir este pedido?')) return;
+    try {
+        const res = await fetch(API_BASE + '/pedidos/' + id, { method: 'DELETE', headers: authHeadersJSON() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        loadPedidos(null);
+        showMessage('pedido-message', 'Pedido excluído!', 'success');
+    } catch (err) {
+        showMessage('pedido-message', 'Erro: ' + err.message, 'error');
+    }
+}
+
+async function avancarStatusPedido(id, status) {
+    if (status === 'recebido') {
+        // Abre modal para escolher almoxarifado
+        document.getElementById('receber_pedido_id').value = id;
+        await carregarAlmoxarifadosModal();
+        document.getElementById('modal-receber-pedido').classList.remove('hidden');
+        return;
+    }
+    // Avanço simples (em_compra ou comprado)
+    try {
+        const res = await fetch(API_BASE + '/pedidos/' + id + '/status', {
+            method: 'PUT',
+            headers: authHeadersJSON(),
+            body: JSON.stringify({ status: status })
+        });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        loadPedidos(null);
+        showMessage('pedido-message', 'Pedido alterado para "' + status + '"!', 'success');
+    } catch (err) {
+        showMessage('pedido-message', 'Erro: ' + err.message, 'error');
+    }
+}
+
+async function confirmarRecebimento() {
+    const id = document.getElementById('receber_pedido_id').value;
+    const almoxarifado_id = document.getElementById('receber_almoxarifado').value;
+    if (!almoxarifado_id) {
+        showMessage('receber-message', 'Selecione um almoxarifado de destino.', 'error');
+        return;
+    }
+    document.getElementById('btn-confirmar-recebimento').disabled = true;
+    document.getElementById('btn-confirmar-recebimento').textContent = 'Processando...';
+    try {
+        const res = await fetch(API_BASE + '/pedidos/' + id + '/status', {
+            method: 'PUT',
+            headers: authHeadersJSON(),
+            body: JSON.stringify({ status: 'recebido', almoxarifado_id: parseInt(almoxarifado_id) })
+        });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        fecharModal('modal-receber-pedido');
+        loadPedidos(null);
+        showMessage('pedido-message', 'Pedido recebido com entrada no estoque!', 'success');
+    } catch (err) {
+        showMessage('receber-message', 'Erro: ' + err.message, 'error');
+    } finally {
+        document.getElementById('btn-confirmar-recebimento').disabled = false;
+        document.getElementById('btn-confirmar-recebimento').textContent = 'Confirmar Recebimento';
+    }
+}
+
+async function carregarAlmoxarifadosModal() {
+    try {
+        const res = await fetch(API_BASE + '/almoxarifados', { headers: authHeadersJSON() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+        const select = document.getElementById('receber_almoxarifado');
+        select.innerHTML = '<option value="">Selecione...</option>';
+        data.data.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            opt.textContent = a.nome;
+            select.appendChild(opt);
+        });
+    } catch (err) {
+        showMessage('receber-message', 'Erro ao carregar almoxarifados: ' + err.message, 'error');
+    }
+}
+
+function cancelarEdicaoPedido() {
+    document.getElementById('form-pedido').reset();
+    document.getElementById('pedido_id').value = '';
+    document.getElementById('btnSalvarPedido').textContent = 'Criar Pedido';
+    document.getElementById('btnCancelarEdicao').style.display = 'none';
+    itensFormulario = [];
+    renderizarItensFormulario();
 }
 
 function abrirFormularioPedido(produtoId) {
@@ -4253,85 +4612,10 @@ function abrirFormularioPedido(produtoId) {
     }
 }
 
-async function editarPedido(id) {
-    try {
-        const res = await fetch(`${API_BASE}/pedidos-compra`, { headers: authHeaders() });
-        if (res.status === 401 || res.status === 403) { logout(); return; }
-        const data = await res.json();
-        const pedidos = data.data || data || [];
-        const p = pedidos.find(x => x.id === id);
-
-        if (!p) { showMessage('pedido-message', 'Pedido não encontrado', 'error'); return; }
-
-        document.getElementById('pedido_id').value = p.id;
-        await carregarProdutosParaPedido();
-        const select = document.getElementById('pedido_produto');
-        if (![...select.options].some(o => o.value === String(p.produto_id))) {
-            const opt = document.createElement('option');
-            opt.value = p.produto_id;
-            opt.textContent = p.produto_nome || `Produto ${p.produto_id}`;
-            select.appendChild(opt);
-        }
-        select.value = String(p.produto_id);
-
-        document.getElementById('quantidade_solicitada').value = p.quantidade_solicitada || '';
-        document.getElementById('fornecedor').value = p.fornecedor || '';
-        document.getElementById('preco_unitario').value = p.preco_unitario != null ? p.preco_unitario : '';
-        document.getElementById('solicitante').value = p.solicitante || '';
-
-        if (p.data_prevista_chegada) {
-            const d = new Date(p.data_prevista_chegada);
-            if (!isNaN(d.getTime())) {
-                const pad = (n) => String(n).padStart(2, '0');
-                document.getElementById('data_prevista_chegada').value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-            }
-        }
-
-        document.getElementById('status_pedido').value = p.status || 'aberto';
-        document.getElementById('observacao').value = p.observacao || '';
-        document.getElementById('btnSalvarPedido').textContent = 'Atualizar Pedido';
-        document.getElementById('btnCancelarEdicao').style.display = 'inline-block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-        showMessage('pedido-message', 'Erro ao editar: ' + err.message, 'error');
-    }
-}
-
-async function salvarPedido(event) {
-    event.preventDefault();
-    const id = document.getElementById('pedido_id').value;
-    const payload = {
-        produto_id: parseInt(document.getElementById('pedido_produto').value, 10),
-        quantidade_solicitada: parseInt(document.getElementById('quantidade_solicitada').value, 10),
-        fornecedor: document.getElementById('fornecedor').value,
-        preco_unitario: parseFloat(document.getElementById('preco_unitario').value) || null,
-        solicitante: document.getElementById('solicitante').value,
-        data_prevista_chegada: document.getElementById('data_prevista_chegada').value || null,
-        status: document.getElementById('status_pedido').value,
-        observacao: document.getElementById('observacao').value
-    };
-
-    try {
-        const url = id ? `${API_BASE}/pedidos-compra/${id}` : `${API_BASE}/pedidos-compra`;
-        const method = id ? 'PUT' : 'POST';
-        const res = await fetch(url, { method, headers: authHeadersJSON(), body: JSON.stringify(payload) });
-        if (res.status === 401 || res.status === 403) { logout(); return; }
-        if (res.status === 409) { alert('Já existe um pedido ativo para este produto.'); return; }
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'Erro ao salvar');
-
-        cancelarEdicaoPedido();
-        loadPedidosCompra(null);
-        showMessage('pedido-message', id ? 'Pedido atualizado!' : 'Pedido criado!', 'success');
-    } catch (err) {
-        showMessage('pedido-message', 'Erro: ' + err.message, 'error');
-    }
-}
-
 async function excluirPedido(id) {
     if (!confirm('Tem certeza que deseja excluir este pedido?')) return;
     try {
-        const res = await fetch(`${API_BASE}/pedidos-compra/${id}`, { method: 'DELETE', headers: authHeadersJSON() });
+        const res = await fetch(`${API_BASE}/pedidos/${id}`, { method: 'DELETE', headers: authHeadersJSON() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
         const data = await res.json();
         if (!data.success) throw new Error(data.message);
@@ -4344,11 +4628,18 @@ async function excluirPedido(id) {
 
 function cancelarEdicaoPedido() {
     const form = document.getElementById('form-pedido');
-    if (form) form.reset();
+    if (form) {
+        form.reset();
+        form.onsubmit = function(e) { salvarPedido(e); };
+    }
     document.getElementById('pedido_id').value = '';
-    document.getElementById('status_pedido').value = 'aberto';
     document.getElementById('btnSalvarPedido').textContent = 'Criar Pedido';
+    document.getElementById('btnSalvarPedido').onclick = null;
     document.getElementById('btnCancelarEdicao').style.display = 'none';
+    document.getElementById('btnCancelarEdicao').textContent = 'Cancelar';
+    habilitarFormulario(true);
+    itensFormulario = [];
+    renderizarItensFormulario();
 }
 
 // ===== TRANSFERÊNCIA DE UNIDADES EM LOTE =====
@@ -4529,6 +4820,11 @@ async function confirmarRetornoManutencaoLote() {
     } catch(e) { msgDiv.innerHTML = `<div style="color: #ef4444; font-size: 13px;">❌ ${e.message}</div>`; }
 }
 
+// Fechar dropdowns ao clicar fora
+document.addEventListener('click', function() {
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => m.classList.remove('show'));
+});
+
 window.addEventListener('load', init);
 </script>
 
@@ -4672,6 +4968,205 @@ window.addEventListener('load', init);
         <div id="retorno_lote_mensagem" style="margin-top: 12px;"></div>
     </div>
 </div>
+
+<!-- Modal Receber Pedido -->
+<div id="modal-receber-pedido" class="modal-overlay hidden">
+    <div class="modal">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 style="margin:0;">📦 Receber Pedido</h3>
+            <button onclick="fecharModal('modal-receber-pedido')" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+        </div>
+        <input type="hidden" id="receber_pedido_id" value="">
+        <p style="color:#6b7280;margin-bottom:16px;font-size:14px;">
+            Selecione o almoxarifado de destino para dar entrada nos itens do pedido.
+        </p>
+        <div class="form-group" style="margin-bottom:16px;">
+            <label for="receber_almoxarifado">Almoxarifado de destino</label>
+            <select id="receber_almoxarifado" style="width:100%;">
+                <option value="">Selecione...</option>
+            </select>
+        </div>
+        <div id="receber-message" style="display:none;padding:12px;border-radius:8px;margin-bottom:12px;font-size:14px;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" class="btn-secondary" onclick="fecharModal('modal-receber-pedido')">Cancelar</button>
+            <button type="button" class="btn-primary" id="btn-confirmar-recebimento" onclick="confirmarRecebimento()">Confirmar Recebimento</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Transferir Itens do Pedido -->
+<div id="modal-transferir-pedido" class="modal-overlay hidden">
+    <div class="modal" style="max-width: 800px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 style="margin:0;">🔄 Transferir Itens do Pedido</h3>
+            <button onclick="fecharModal('modal-transferir-pedido')" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
+        </div>
+        <input type="hidden" id="transferir_pedido_id" value="">
+        <p style="color:#6b7280;margin-bottom:16px;font-size:14px;">
+            Defina a quantidade a transferir e o almoxarifado de destino para cada item.
+        </p>
+        <div id="transferir-itens-lista" style="margin-bottom:16px;">
+            <!-- Itens serão inseridos aqui via JS -->
+        </div>
+        <div id="transferir-message" style="display:none;padding:12px;border-radius:8px;margin-bottom:12px;font-size:14px;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button type="button" class="btn-secondary" onclick="fecharModal('modal-transferir-pedido')">Cancelar</button>
+            <button type="button" class="btn-primary" id="btn-confirmar-transferencia" onclick="confirmarTransferencia()" style="background:#f59e0b;">Confirmar Transferência</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function transferirPedido(id) {
+    document.getElementById('transferir_pedido_id').value = id;
+    document.getElementById('transferir-message').style.display = 'none';
+    document.getElementById('btn-confirmar-transferencia').disabled = false;
+    document.getElementById('btn-confirmar-transferencia').textContent = 'Confirmar Transferência';
+
+    try {
+        const res = await fetch(`/pedidos/${id}`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        });
+        const data = await res.json();
+        if (!data.success) {
+            showMessage('transferir-message', 'Erro ao carregar pedido: ' + data.message, 'error');
+            return;
+        }
+
+        const itens = data.data.itens;
+        if (!itens || itens.length === 0) {
+            showMessage('transferir-message', 'Este pedido não possui itens.', 'error');
+            return;
+        }
+
+        // Carregar almoxarifados para os selects
+        const resAlmox = await fetch('/almoxarifados', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        });
+        const dataAlmox = await resAlmox.json();
+        const almoxarifados = dataAlmox.success ? dataAlmox.data : [];
+        const optionsAlmox = almoxarifados.map(a =>
+            `<option value="${a.id}">${a.nome}</option>`
+        ).join('');
+
+        let html = `<table style="width:100%;border-collapse:collapse;font-size:14px;">
+            <thead>
+                <tr style="background:#f3f4f6;text-align:left;">
+                    <th style="padding:8px;border:1px solid #e5e7eb;">Produto</th>
+                    <th style="padding:8px;border:1px solid #e5e7eb;width:80px;">Qtd.</th>
+                    <th style="padding:8px;border:1px solid #e5e7eb;width:100px;">Transferir</th>
+                    <th style="padding:8px;border:1px solid #e5e7eb;width:200px;">Almox. Origem</th>
+                    <th style="padding:8px;border:1px solid #e5e7eb;width:200px;">Almox. Destino</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        itens.forEach(item => {
+            const qtd = item.quantidade_solicitada;
+            const qtd_transferida = item.quantidade_transferida || 0;
+            const saldo = qtd - qtd_transferida;
+            if (saldo <= 0) return;
+            html += `<tr>
+                <td style="padding:8px;border:1px solid #e5e7eb;">
+                    <strong>${item.produto_nome}</strong>
+                    <input type="hidden" class="transferir-produto-id" value="${item.produto_id}">
+                    <input type="hidden" class="transferir-item-id" value="${item.id}">
+                </td>
+                <td style="padding:8px;border:1px solid #e5e7eb;text-align:center;">${saldo}</td>
+                <td style="padding:8px;border:1px solid #e5e7eb;">
+                    <input type="number" class="transferir-qtd" min="0" max="${saldo}" value="0"
+                           style="width:80px;padding:4px;border:1px solid #d1d5db;border-radius:4px;">
+                </td>
+                <td style="padding:8px;border:1px solid #e5e7eb;">
+                    <select class="transferir-origem" style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:4px;">
+                        <option value="">Selecione...</option>
+                        ${optionsAlmox}
+                    </select>
+                </td>
+                <td style="padding:8px;border:1px solid #e5e7eb;">
+                    <select class="transferir-destino" style="width:100%;padding:4px;border:1px solid #d1d5db;border-radius:4px;">
+                        <option value="">Selecione...</option>
+                        ${optionsAlmox}
+                    </select>
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('transferir-itens-lista').innerHTML = html;
+        document.getElementById('modal-transferir-pedido').classList.remove('hidden');
+    } catch (err) {
+        showMessage('transferir-message', 'Erro: ' + err.message, 'error');
+    }
+}
+
+async function confirmarTransferencia() {
+    const pedidoId = document.getElementById('transferir_pedido_id').value;
+    const linhas = document.querySelectorAll('#transferir-itens-lista tbody tr');
+    const itens = [];
+
+    for (const linha of linhas) {
+        const produtoId = parseInt(linha.querySelector('.transferir-produto-id').value);
+        const qtd = parseInt(linha.querySelector('.transferir-qtd').value) || 0;
+        const origemId = parseInt(linha.querySelector('.transferir-origem').value);
+        const destinoId = parseInt(linha.querySelector('.transferir-destino').value);
+
+        if (qtd <= 0) continue;
+
+        if (!origemId || !destinoId) {
+            showMessage('transferir-message', 'Selecione origem e destino para todos os itens com quantidade.', 'error');
+            return;
+        }
+        if (origemId === destinoId) {
+            showMessage('transferir-message', 'Origem e destino devem ser diferentes.', 'error');
+            return;
+        }
+
+        itens.push({
+            produto_id: produtoId,
+            quantidade: qtd,
+            almoxarifado_origem_id: origemId,
+            almoxarifado_destino_id: destinoId
+        });
+    }
+
+    if (itens.length === 0) {
+        showMessage('transferir-message', 'Informe ao menos um item com quantidade para transferir.', 'error');
+        return;
+    }
+
+    document.getElementById('btn-confirmar-transferencia').disabled = true;
+    document.getElementById('btn-confirmar-transferencia').textContent = 'Transferindo...';
+
+    try {
+        const res = await fetch(`/pedidos/${pedidoId}/transferir`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify({ itens })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showMessage('transferir-message', data.message, 'success');
+            document.getElementById('btn-confirmar-transferencia').textContent = '✅ Transferido';
+            setTimeout(() => {
+                fecharModal('modal-transferir-pedido');
+                carregarPedidos();
+            }, 1500);
+        } else {
+            showMessage('transferir-message', data.message, 'error');
+            document.getElementById('btn-confirmar-transferencia').disabled = false;
+            document.getElementById('btn-confirmar-transferencia').textContent = 'Confirmar Transferência';
+        }
+    } catch (err) {
+        showMessage('transferir-message', 'Erro: ' + err.message, 'error');
+        document.getElementById('btn-confirmar-transferencia').disabled = false;
+        document.getElementById('btn-confirmar-transferencia').textContent = 'Confirmar Transferência';
+    }
+}
+</script>
 
 </body>
 </html>

@@ -87,7 +87,7 @@ else:
     # MODO DESENVOLVIMENTO (SQLite)
     # ============================================================
     import os
-    DATABASE = os.environ.get('DB_PATH', '/tmp/sistema.db')
+    DATABASE = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'sistema.db'))
 
     @contextmanager
     def get_connection():
@@ -190,7 +190,10 @@ def init_db():
         _migrate_produtos_depreciacao(conn)
         _migrate_produtos_sobressalente(conn) 
         _create_equipamentos(conn)
-        _create_pedidos_compra(conn)
+        _create_pedidos(conn)
+        _create_pedidos_itens(conn)
+        _migrate_pedidos_compra(conn)
+        _migrate_quantidade_transferida(conn)
 
         # Migração do perfil na tabela usuarios
         # (usa verificação em vez de try/except — PostgreSQL aborta transação em erro)
@@ -515,6 +518,99 @@ def _create_pedidos_compra(conn):
         )
     ''')
     conn.commit()
+
+# ============================================================
+# NOVAS TABELAS: pedidos (cabeçalho) + pedidos_itens (N itens)
+# ============================================================
+def _create_pedidos(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS pedidos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fornecedor TEXT,
+            solicitante TEXT,
+            observacao TEXT,
+            status TEXT DEFAULT 'aberto' 
+                CHECK(status IN ('aberto', 'em_compra', 'comprado', 'recebido')),
+            data_abertura TIMESTAMP,
+            data_em_compra TIMESTAMP,
+            data_comprado TIMESTAMP,
+            data_recebido TIMESTAMP,
+            data_pedido TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+
+def _create_pedidos_itens(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS pedidos_itens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pedido_id INTEGER NOT NULL,
+            produto_id INTEGER NOT NULL,
+            quantidade_solicitada INTEGER NOT NULL,
+            preco_unitario REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (pedido_id) REFERENCES pedidos(id) ON DELETE CASCADE,
+            FOREIGN KEY (produto_id) REFERENCES produtos(id)
+        )
+    ''')
+    conn.commit()
+
+def _migrate_pedidos_compra(conn):
+    """Migra dados da tabela antiga pedidos_compra para pedidos + pedidos_itens."""
+    if not _table_exists(conn, 'pedidos_compra'):
+        return
+    count = conn.execute('SELECT COUNT(*) FROM pedidos').fetchone()[0]
+    if count > 0:
+        return
+    rows = conn.execute('''
+        SELECT * FROM pedidos_compra ORDER BY id
+    ''').fetchall()
+    for row in rows:
+        row = dict(row)
+        status = row['status']
+        data_abertura = row['created_at'] if status == 'aberto' else row['updated_at']
+        data_em_compra = row['updated_at'] if status == 'em_compra' else None
+        data_comprado = row['updated_at'] if status == 'comprado' else None
+        conn.execute('''
+            INSERT INTO pedidos 
+                (id, fornecedor, solicitante, observacao, status,
+                 data_abertura, data_em_compra, data_comprado,
+                 data_pedido, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            row['id'], row['fornecedor'], row['solicitante'], row['observacao'],
+            status, data_abertura, data_em_compra, data_comprado,
+            row['data_pedido'], row['created_at'], row['updated_at']
+        ))
+        conn.execute('''
+            INSERT INTO pedidos_itens 
+                (pedido_id, produto_id, quantidade_solicitada, preco_unitario)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            row['id'], row['produto_id'], row['quantidade_solicitada'], row['preco_unitario']
+        ))
+    conn.commit()
+    print(f"Migração: {len(rows)} pedidos migrados de pedidos_compra para pedidos + pedidos_itens.")
+
+def _migrate_quantidade_transferida(conn):
+    """
+    Migration: adiciona coluna quantidade_transferida em pedidos_itens
+    para permitir transferência parcial de itens do pedido.
+    """
+    try:
+        conn.execute('''
+            ALTER TABLE pedidos_itens 
+            ADD COLUMN quantidade_transferida INTEGER DEFAULT 0
+        ''')
+        conn.commit()
+        print("Migration: coluna 'quantidade_transferida' adicionada em pedidos_itens.")
+    except Exception as e:
+        if 'duplicate column' in str(e).lower():
+            print("Migration: coluna 'quantidade_transferida' já existe.")
+        else:
+            print(f"Migration: erro ao adicionar coluna: {e}")
 
 def _create_transferencias(conn):
     conn.execute("""
