@@ -25,58 +25,42 @@ if USE_POSTGRES:
     import psycopg2
     from psycopg2.extras import RealDictCursor
 
-    class _PgCursor:
-        """Wrapper de cursor que simula o comportamento do sqlite3."""
-        def __init__(self, cursor):
-            self._cursor = cursor
-
-        def execute(self, sql, params=None):
-            sql = sql.replace('?', '%s')
-            if params is not None:
-                self._cursor.execute(sql, params)
-            else:
-                self._cursor.execute(sql)
-            return self
-
-        def fetchall(self):
-            return self._cursor.fetchall()
-
-        def fetchone(self):
-            return self._cursor.fetchone()
-
-        @property
-        def rowcount(self):
-            return self._cursor.rowcount
-
     class _PgConnection:
         """Wrapper de conexão que simula o comportamento do sqlite3."""
+
+        class _PgCursor:
+            """Wrapper de cursor que simula o comportamento do sqlite3."""
+            def __init__(self, cursor):
+                self._cursor = cursor
+
+            def execute(self, sql, params=None):
+                # Conversoes automaticas de sintaxe SQLite -> PostgreSQL
+                sql = sql.replace('?', '%s')
+                sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+                # julianday() - funcao exclusiva do SQLite. No PostgreSQL:
+                # julianday(col) - julianday('now') -> (col::date - CURRENT_DATE)
+                sql = re.sub(
+                    r"julianday\(([^)]+)\)\s*-\s*julianday\('now'\)",
+                    r"\1::date - CURRENT_DATE",
+                    sql
+                )
+                # CAST(julianday(...) - julianday('now') AS INTEGER) -> (col::date - CURRENT_DATE)
+                sql = re.sub(
+                    r"CAST\s*\(\s*julianday\(([^)]+)\)\s*-\s*julianday\('now'\)\s*AS\s+INTEGER\s*\)",
+                    r"\1::date - CURRENT_DATE",
+                    sql
+                )
+                if params is not None:
+                    self._cursor.execute(sql, params)
+                else:
+                    self._cursor.execute(sql)
+                return self._cursor
+
         def __init__(self, conn):
             self._conn = conn
 
-        def execute(self, sql, params=None):
-            # Conversões automáticas de sintaxe SQLite → PostgreSQL
-            sql = sql.replace('?', '%s')
-            sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
-            # julianday() — função exclusiva do SQLite. No PostgreSQL:
-            # julianday(col) - julianday('now') → (col::date - CURRENT_DATE)
-            sql = re.sub(
-                r"julianday\(([^)]+)\)\s*-\s*julianday\('now'\)",
-                r"(::date - CURRENT_DATE)",
-                sql
-            )
-            # CAST(julianday(...) - julianday('now') AS INTEGER) → já retorna int no PG
-            sql = re.sub(
-                r"CAST\s*\(\s*julianday\(([^)]+)\)\s*-\s*julianday\('now'\)\s*AS\s+INTEGER\s*\)",
-                r"(::date - CURRENT_DATE)",
-                sql
-            )
-
-            cursor = self._conn.cursor(cursor_factory=RealDictCursor)
-            if params is not None:
-                cursor.execute(sql, params)
-            else:
-                cursor.execute(sql)
-            return _PgCursor(cursor)
+        def cursor(self):
+            return self._PgCursor(self._conn.cursor(cursor_factory=RealDictCursor))
 
         def commit(self):
             self._conn.commit()
@@ -95,7 +79,6 @@ if USE_POSTGRES:
             yield _PgConnection(conn)
         finally:
             conn.close()
-
 else:
     # ============================================================
     # MODO DESENVOLVIMENTO (SQLite)
@@ -814,10 +797,11 @@ def calcular_vlc_total(conn, produto_id=None):
     
     # Itera sobre as unidades e calcula os totais
     for row in cursor.fetchall():
-        valor_aquisicao = row[0] or 0.0
-        valor_residual = row[1] or 0.0
-        vida_util_meses = row[2]
-        data_aquisicao = row[3]
+        # Usa acesso por nome (RealDictCursor no PostgreSQL ou sqlite3.Row)
+        valor_aquisicao = row['valor_aquisicao'] or 0.0
+        valor_residual = row['valor_residual'] or 0.0
+        vida_util_meses = row['vida_util_meses']
+        data_aquisicao = row['data_aquisicao']
         
         # Calcula o VLC da unidade
         vlc = calcular_vlc_unidade(valor_aquisicao, valor_residual, vida_util_meses, data_aquisicao)
