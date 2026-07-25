@@ -1259,6 +1259,13 @@ th, td {
                     <button type="button" class="btn-secondary" style="font-size: 13px;" onclick="carregarEstoque()">🔄 Atualizar</button>
                 </div>
             </div>
+             <div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
+                <button id="btnAbrirPedidoEstoque" onclick="abrirPedidoItensSelecionados()"
+                        style="display:none;padding:8px 16px;background:#ff9800;color:#fff;border:none;border-radius:6px;cursor:pointer;font-weight:600;">
+                    🛒 Abrir Pedido dos Selecionados
+                </button>
+                <span id="qtdSelecionados" style="font-size:13px;color:#666;"></span>
+            </div>
             <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                 <table>
                     <thead>
@@ -1277,7 +1284,7 @@ th, td {
                     </thead>
                     <tbody id="tabela-estoque">
                         <tr>
-                            <td colspan="8" style="text-align: center; color: #9ca3af; padding: 24px;">
+                            <td colspan="11" style="text-align: center; color: #9ca3af; padding: 24px;">
                                 Nenhum produto no estoque.
                             </td>
                         </tr>
@@ -2248,7 +2255,7 @@ async function carregarEstoque() {
         tbody.innerHTML = '';
 
         if (!dados || dados.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999;padding:16px;">Nenhum item em estoque</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:16px;">Nenhum item em estoque</td></tr>';
             return;
         }
 
@@ -2275,8 +2282,13 @@ async function carregarEstoque() {
                 statusLabel = 'NORMAL'; statusBg = '#27ae60'; statusCor = '#fff';
             }
 
+            const naoNormal = statusLabel !== 'NORMAL';
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
+                <td style="text-align:center;width:40px;">
+                    ${naoNormal ? `<input type="checkbox" class="checkbox-item-estoque" data-index="${index}" onchange="atualizarBtnPedidoEstoque()">` : ''}
+                </td>
                 <td>${item.codigo_interno || '-'}</td>
                 <td>${item.produto_nome || '-'}</td>
                 <td>${item.categoria || '-'}</td>
@@ -2558,6 +2570,56 @@ function limparFiltrosEstoque() {
 
 function exportarEstoque() {
     alert('Exportação será implementada em breve.');
+}
+
+function atualizarBtnPedidoEstoque() {
+    const checks = document.querySelectorAll('.checkbox-item-estoque:checked');
+    const btn = document.getElementById('btnAbrirPedidoEstoque');
+    const span = document.getElementById('qtdSelecionados');
+    if (checks.length > 0) {
+        btn.style.display = 'inline-flex';
+        span.textContent = checks.length + ' item(ns) selecionado(s)';
+    } else {
+        btn.style.display = 'none';
+        span.textContent = '';
+    }
+}
+
+function abrirPedidoItensSelecionados() {
+    const checks = document.querySelectorAll('.checkbox-item-estoque:checked');
+    const indices = Array.from(checks).map(c => parseInt(c.dataset.index));
+    const itens = indices.map(i => estoqueDadosCache[i]);
+
+    // Limpar formulário de pedido
+    const form = document.getElementById('form-pedido');
+    if (form) form.reset();
+    document.getElementById('pedido_id').value = '';
+    document.getElementById('status_pedido').value = 'aberto';
+    document.getElementById('btnSalvarPedido').textContent = 'Criar Pedido';
+    document.getElementById('btnCancelarEdicao').style.display = 'none';
+
+    // Ir para aba pedidos e carregar produtos
+    showTab('pedidos');
+    carregarProdutosParaPedido().then(() => {
+        itensFormulario = [];
+        itens.forEach(item => {
+            const produtoId = item.produto_id || item.id;
+            const qtdAtual = parseFloat(item.quantidade) || 0;
+            const estoqueMin = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
+            const qtdSugerida = Math.ceil((estoqueMin * 1.5) - qtdAtual);
+            itensFormulario.push({
+                produto_id: produtoId,
+                produto_nome: item.produto_nome || item.nome || 'Produto ' + produtoId,
+                quantidade_solicitada: Math.max(1, qtdSugerida),
+                preco_unitario: null
+            });
+        });
+        renderizarItensFormulario();
+        showMessage('pedido-message', itensFormulario.length + ' itens adicionados ao pedido!', 'success');
+        // Desmarcar checks
+        document.querySelectorAll('.checkbox-item-estoque:checked').forEach(c => c.checked = false);
+        atualizarBtnPedidoEstoque();
+    });
 }
 
 // ========== EXPORTAR / IMPORTAR ESTOQUE ==========
