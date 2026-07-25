@@ -13,7 +13,7 @@ from io import BytesIO
 import tempfile
 import math
 
-from database import get_connection, init_db, calcular_vlc_total
+from database import get_connection, init_db, calcular_vlc_total, USE_POSTGRES
 
 from functools import wraps
 

@@ -1,3 +1,4 @@
+import re
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -56,6 +57,19 @@ if USE_POSTGRES:
             # Conversões automáticas de sintaxe SQLite → PostgreSQL
             sql = sql.replace('?', '%s')
             sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+            # julianday() — função exclusiva do SQLite. No PostgreSQL:
+            # julianday(col) - julianday('now') → (col::date - CURRENT_DATE)
+            sql = re.sub(
+                r"julianday\(([^)]+)\)\s*-\s*julianday\('now'\)",
+                r"(::date - CURRENT_DATE)",
+                sql
+            )
+            # CAST(julianday(...) - julianday('now') AS INTEGER) → já retorna int no PG
+            sql = re.sub(
+                r"CAST\s*\(\s*julianday\(([^)]+)\)\s*-\s*julianday\('now'\)\s*AS\s+INTEGER\s*\)",
+                r"(::date - CURRENT_DATE)",
+                sql
+            )
 
             cursor = self._conn.cursor(cursor_factory=RealDictCursor)
             if params is not None:
@@ -168,6 +182,22 @@ def _migrate_produtos_sobressalente(conn):
     if not _column_exists(conn, 'produtos', 'sobressalente'):
         conn.execute("ALTER TABLE produtos ADD COLUMN sobressalente BOOLEAN DEFAULT FALSE")
         print("Migração: coluna 'sobressalente' adicionada à tabela produtos.")
+
+
+
+def sql_dias_restantes(coluna):
+    """Retorna expressao SQL para calcular dias restantes ate a data da coluna."""
+    if USE_POSTGRES:
+        return f"EXTRACT(DAY FROM ({coluna} - CURRENT_DATE))"
+    else:
+        return f"CAST(julianday({coluna}) - julianday('now') AS INTEGER)"
+
+def sql_data_dentro_proximos_30_dias(coluna):
+    """Retorna condicao SQL: coluna entre hoje e 30 dias a frente."""
+    if USE_POSTGRES:
+        return f"({coluna} >= CURRENT_DATE AND {coluna} <= CURRENT_DATE + INTERVAL '30 days')"
+    else:
+        return f"({coluna} >= DATE('now') AND {coluna} <= DATE('now', '+30 days'))"
 
 def init_db():
     """Cria/atualiza todas as tabelas do banco."""
