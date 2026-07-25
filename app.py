@@ -2445,7 +2445,7 @@ def dashboard():
                    FROM movimentacoes m
                    LEFT JOIN colaboradores c ON m.colaborador_id = c.id
                    WHERE m.tipo = 'saida'
-                   GROUP BY m.colaborador_id
+                   GROUP BY c.nome, m.colaborador_id
                    ORDER BY quantidade_total DESC
                    LIMIT 10'''
             ).fetchall()
