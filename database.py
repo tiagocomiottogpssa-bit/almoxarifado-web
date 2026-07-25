@@ -50,6 +50,27 @@ if USE_POSTGRES:
                     r"\1::date - CURRENT_DATE",
                     sql
                 )
+                # Boolean: converte 0/1 do SQLite para TRUE/FALSE do PostgreSQL
+                sql = re.sub(
+                    r"COALESCE\(([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*),\s*0\)\s*=\s*1",
+                    r"( IS TRUE)",
+                    sql
+                )
+                sql = re.sub(
+                    r"COALESCE\(([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*),\s*0\)\s*=\s*0",
+                    r"( IS NOT TRUE)",
+                    sql
+                )
+                sql = re.sub(
+                    r"(controla_depreciacao|requer_calibracao|sobressalente|requer_equipamento|ativo)\s*=\s*1",
+                    r" = TRUE",
+                    sql
+                )
+                sql = re.sub(
+                    r"(controla_depreciacao|requer_calibracao|sobressalente|requer_equipamento|ativo)\s*=\s*0",
+                    r" = FALSE",
+                    sql
+                )
                 if params is not None:
                     self._cursor.execute(sql, params)
                 else:
