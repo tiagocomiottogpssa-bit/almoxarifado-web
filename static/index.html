@@ -1270,6 +1270,7 @@ th, td {
                 <table>
                     <thead>
                         <tr>
+                            <th style="width:40px; min-width:40px; text-align:center;"></th>
                             <th style="width:70px; min-width:70px;">Código</th>
                             <th style="width:150px; min-width:150px;">Produto</th>
                             <th style="width:100px; min-width:100px;">Categoria</th>
@@ -2284,10 +2285,13 @@ async function carregarEstoque() {
 
             const naoNormal = statusLabel !== 'NORMAL';
 
+            const possuiPedido = item.possui_pedido_aberto === 1 || item.possui_pedido_aberto === true;
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td style="text-align:center;width:40px;">
                     ${naoNormal ? `<input type="checkbox" class="checkbox-item-estoque" data-index="${index}" onchange="atualizarBtnPedidoEstoque()">` : ''}
+                    ${possuiPedido ? '<span style="font-size:14px;cursor:default;margin-left:2px;" title="Este produto já possui pedido em aberto">📋</span>' : ''}
                 </td>
                 <td>${item.codigo_interno || '-'}</td>
                 <td>${item.produto_nome || '-'}</td>

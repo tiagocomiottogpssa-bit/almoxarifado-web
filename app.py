@@ -1676,7 +1676,13 @@ def listar_estoque():
                p.nome AS produto_nome, p.codigo_interno, p.categoria, p.custo_medio,
                p.estoque_minimo AS produto_estoque_minimo,
                e.quantidade * COALESCE(p.custo_medio, 0) AS valor_patrimonial,
-               a.nome AS almoxarifado_nome
+               a.nome AS almoxarifado_nome,
+                CASE WHEN EXISTS (
+                   SELECT 1 FROM pedidos_itens pi
+                   JOIN pedidos pd ON pd.id = pi.pedido_id
+                   WHERE pi.produto_id = e.produto_id
+                   AND pd.status IN ('aberto', 'em_compra')
+               ) THEN 1 ELSE 0 END as possui_pedido_aberto
         FROM estoque e
         LEFT JOIN produtos p ON e.produto_id = p.id
         LEFT JOIN almoxarifados a ON e.almoxarifado_id = a.id
