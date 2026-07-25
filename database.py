@@ -53,22 +53,22 @@ if USE_POSTGRES:
                 # Boolean: converte 0/1 do SQLite para TRUE/FALSE do PostgreSQL
                 sql = re.sub(
                     r"COALESCE\(([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*),\s*0\)\s*=\s*1",
-                    r"( IS TRUE)",
+                    r"(\1 IS TRUE)",
                     sql
                 )
                 sql = re.sub(
                     r"COALESCE\(([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*),\s*0\)\s*=\s*0",
-                    r"( IS NOT TRUE)",
+                    r"(\1 IS NOT TRUE)",
                     sql
                 )
                 sql = re.sub(
-                    r"(controla_depreciacao|requer_calibracao|sobressalente|requer_equipamento|ativo)\s*=\s*1",
-                    r" = TRUE",
+                    r"\b(controla_depreciacao|requer_calibracao|sobressalente|requer_equipamento|ativo)\s*=\s*1\b",
+                    r"\1 = TRUE",
                     sql
                 )
                 sql = re.sub(
-                    r"(controla_depreciacao|requer_calibracao|sobressalente|requer_equipamento|ativo)\s*=\s*0",
-                    r" = FALSE",
+                    r"\b(controla_depreciacao|requer_calibracao|sobressalente|requer_equipamento|ativo)\s*=\s*0\b",
+                    r"\1 = FALSE",
                     sql
                 )
                 if params is not None:
