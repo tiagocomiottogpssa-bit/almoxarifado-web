@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_cors import CORS
@@ -2557,9 +2557,8 @@ def listar_pedidos():
         base_sql = '''
             SELECT p.*,
                    COUNT(pi.id) as total_itens,
-                   SUM(pi.quantidade_solicitada - COALESCE(pi.quantidade_transferida, 0)) as qtd_total,
-                   SUM(COALESCE(pi.quantidade_transferida, 0)) as qtd_transferida,
-                   COALESCE(SUM(pi.preco_unitario * (pi.quantidade_solicitada - COALESCE(pi.quantidade_transferida, 0))), 0) as valor_total
+                   SUM(pi.quantidade_solicitada) as qtd_total,
+                   COALESCE(SUM(pi.preco_unitario * pi.quantidade_solicitada), 0) as valor_total
             FROM pedidos p
             LEFT JOIN pedidos_itens pi ON p.id = pi.pedido_id
         '''
@@ -2594,8 +2593,7 @@ def obter_pedido(id):
             if not pedido:
                 return response(False, message='Pedido não encontrado.', status_code=404)
             itens = conn.execute('''
-                SELECT pi.*, pr.nome as produto_nome, pr.codigo_fabricante, pr.codigo_interno,
-                       (pi.quantidade_solicitada - COALESCE(pi.quantidade_transferida, 0)) as saldo
+                SELECT pi.*, pr.nome as produto_nome, pr.codigo_fabricante, pr.codigo_interno
                 FROM pedidos_itens pi
                 LEFT JOIN produtos pr ON pi.produto_id = pr.id
                 WHERE pi.pedido_id = ?
@@ -2620,12 +2618,12 @@ def criar_pedido():
         current_user = get_jwt_identity()
         with get_connection() as conn:
             user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-            pedido_id = conn.execute('''
+            conn.execute('''
                 INSERT INTO pedidos
                     (fornecedor, solicitante, observacao, status, data_abertura, data_pedido, created_at, updated_at)
                 VALUES (?, ?, ?, 'aberto', ?, ?, ?, ?)
-                RETURNING id
-            ''', (fornecedor, solicitante, observacao, now_iso(), now_iso(), now_iso(), now_iso())).fetchone()['id']
+            ''', (fornecedor, solicitante, observacao, now_iso(), now_iso(), now_iso(), now_iso()))
+            pedido_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
             for item in itens:
                 conn.execute('''
                     INSERT INTO pedidos_itens (pedido_id, produto_id, quantidade_solicitada, preco_unitario)
@@ -2707,169 +2705,6 @@ def deletar_pedido(id):
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
-@app.route('/pedidos/<int:id>/transferir', methods=['POST'])
-@jwt_required()
-@perfil_required('admin', 'operador')
-def transferir_itens_pedido(id):
-    try:
-        data = request.get_json(silent=True) or {}
-        itens = data.get('itens', [])
-
-        if not itens:
-            return response(False, message='Nenhum item informado para transferência.', status_code=400)
-
-        current_user = get_jwt_identity()
-
-        with get_connection() as conn:
-            # Validar pedido
-            pedido = conn.execute('SELECT id, status FROM pedidos WHERE id = ?', (id,)).fetchone()
-            if not pedido:
-                return response(False, message='Pedido não encontrado.', status_code=404)
-            if pedido['status'] != 'aberto':
-                return response(False, message='Apenas pedidos em aberto podem ter itens transferidos.', status_code=400)
-
-            # Buscar itens do pedido
-            itens_pedido = {
-                row['produto_id']: dict(row)
-                for row in conn.execute(
-                    '''SELECT pi.*, pr.nome as produto_nome
-                       FROM pedidos_itens pi
-                       JOIN produtos pr ON pi.produto_id = pr.id
-                       WHERE pi.pedido_id = ?''', (id,)
-                ).fetchall()
-            }
-
-            transferencias_criadas = []
-
-            for item in itens:
-                produto_id = item.get('produto_id')
-                quantidade = item.get('quantidade', 0)
-                origem_id = item.get('almoxarifado_origem_id')
-                destino_id = item.get('almoxarifado_destino_id')
-
-                if not all([produto_id, quantidade, origem_id, destino_id]):
-                    return response(False, message='Cada item deve ter: produto_id, quantidade, almoxarifado_origem_id, almoxarifado_destino_id.', status_code=400)
-
-                try:
-                    quantidade = int(quantidade)
-                except (TypeError, ValueError):
-                    return response(False, message=f'Quantidade inválida para produto {produto_id}.', status_code=400)
-
-                if quantidade <= 0:
-                    return response(False, message=f'Quantidade deve ser maior que zero.', status_code=400)
-
-                if origem_id == destino_id:
-                    return response(False, message=f'Origem e destino devem ser diferentes.', status_code=400)
-
-                # Validar que o item pertence ao pedido
-                if produto_id not in itens_pedido:
-                    return response(False, message=f'Produto {produto_id} não pertence a este pedido.', status_code=400)
-
-                pi = itens_pedido[produto_id]
-                qtd_transferida = pi.get('quantidade_transferida', 0) or 0
-                saldo_disponivel = pi['quantidade_solicitada'] - qtd_transferida
-
-                if quantidade > saldo_disponivel:
-                    return response(False,
-                        message=f'{pi["produto_nome"]}: transferência excede saldo disponível ({saldo_disponivel}).',
-                        status_code=400)
-
-                # Validar almoxarifados
-                origem = conn.execute('SELECT id, nome FROM almoxarifados WHERE id = ?', (origem_id,)).fetchone()
-                if not origem:
-                    return response(False, message=f'Almoxarifado de origem não encontrado.', status_code=404)
-                destino = conn.execute('SELECT id, nome FROM almoxarifados WHERE id = ?', (destino_id,)).fetchone()
-                if not destino:
-                    return response(False, message=f'Almoxarifado de destino não encontrado.', status_code=404)
-
-                # Verificar saldo no estoque
-                saldo_row = conn.execute(
-                    'SELECT quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
-                    (produto_id, origem_id)
-                ).fetchone()
-                saldo_atual = saldo_row['quantidade'] if saldo_row else 0
-
-                if saldo_atual < quantidade:
-                    return response(False,
-                        message=f'Saldo insuficiente de {pi["produto_nome"]} em {origem["nome"]}.',
-                        status_code=409)
-
-                # 1. Dar baixa no estoque de origem
-                conn.execute(
-                    'UPDATE estoque SET quantidade = quantidade - ? WHERE produto_id = ? AND almoxarifado_id = ?',
-                    (quantidade, produto_id, origem_id)
-                )
-
-                # 2. Criar transferencia
-                conn.execute(
-                    '''INSERT INTO transferencias
-                       (produto_id, almoxarifado_origem_id, almoxarifado_destino_id,
-                        quantidade_total, quantidade_recebida, valor_unitario, status,
-                        documento, tecnico, ordem_servico, observacao, data_envio, enviado_por)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (produto_id, origem_id, destino_id,
-                     quantidade, 0, None, 'enviada',
-                     f'Pedido #{id}', None, None,
-                     f'Transferência automática do Pedido #{id}', now_iso(), current_user)
-                )
-
-                trow = conn.execute('SELECT id FROM transferencias ORDER BY id DESC LIMIT 1').fetchone()
-                transfer_id = trow['id']
-
-                # 3. Registrar movimentação de saída
-                conn.execute(
-                    '''INSERT INTO movimentacoes
-                       (produto_id, almoxarifado_id, colaborador_id, tipo, quantidade,
-                        valor_unitario, documento, tecnico, ordem_servico, observacao, data)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (produto_id, origem_id, None, 'saida', quantidade,
-                     None, f'Pedido #{id}', None, None,
-                     f'Transferência #{transfer_id} para {destino["nome"]} (Pedido #{id})', now_iso())
-                )
-
-                # 4. Atualizar quantidade_transferida no pedido
-                conn.execute(
-                    'UPDATE pedidos_itens SET quantidade_transferida = COALESCE(quantidade_transferida, 0) + ? WHERE id = ?',
-                    (quantidade, pi['id'])
-                )
-
-                transferencias_criadas.append({
-                    'transfer_id': transfer_id,
-                    'produto_id': produto_id,
-                    'produto_nome': pi['produto_nome'],
-                    'quantidade': quantidade,
-                    'origem': origem['nome'],
-                    'destino': destino['nome']
-                })
-
-            # Registrar log
-            user_row = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-            user_id = user_row['id'] if user_row else None
-            registrar_log(user_id, current_user, 'transferir', 'pedidos',
-                f'Transferência de {len(transferencias_criadas)} itens do Pedido #{id}',
-                conn=conn)
-
-            # Verificar se todos os itens do pedido foram totalmente transferidos
-            restante = conn.execute('''
-                SELECT COUNT(*) as total,
-                       SUM(CASE WHEN COALESCE(quantidade_transferida, 0) < quantidade_solicitada THEN 1 ELSE 0 END) as pendentes
-                FROM pedidos_itens WHERE pedido_id = ?
-            ''', (id,)).fetchone()
-            if restante and restante['pendentes'] == 0:
-                conn.execute('UPDATE pedidos SET status = ?, data_recebido = ? WHERE id = ?',
-                             ('recebido', now_iso(), id))
-
-            conn.commit()
-
-        return response(True, data={
-            'transferencias': transferencias_criadas,
-            'total_itens': len(transferencias_criadas)
-        }, message=f'{len(transferencias_criadas)} itens transferidos com sucesso.')
-
-    except Exception:
-        import traceback; traceback.print_exc()
-        return response(False, message='Erro interno ao transferir itens do pedido.', status_code=500)
-
 @app.route('/pedidos/<int:id>/status', methods=['PUT'])
 @jwt_required()
 def avancar_status_pedido(id):
@@ -2882,61 +2717,6 @@ def avancar_status_pedido(id):
             pedido = conn.execute('SELECT id, status FROM pedidos WHERE id = ?', (id,)).fetchone()
             if not pedido:
                 return response(False, message='Pedido não encontrado.', status_code=404)
-
-            # Se for recebido, dar entrada no estoque
-            if novo_status == 'recebido':
-                almoxarifado_id = data.get('almoxarifado_id')
-                if not almoxarifado_id:
-                    return response(False, message='Informe o almoxarifado de destino.', status_code=400)
-
-                # Buscar itens do pedido
-                itens = conn.execute(
-                    'SELECT pi.produto_id, pi.quantidade_solicitada FROM pedidos_itens pi WHERE pi.pedido_id = ?',
-                    (id,)
-                ).fetchall()
-
-                if not itens:
-                    return response(False, message='Pedido sem itens para dar entrada.', status_code=400)
-
-                for item in itens:
-                    produto_id = item['produto_id']
-                    qtd = item['quantidade_solicitada']
-
-                    # Verificar se já existe registro de estoque para este produto+almoxarifado
-                    existente = conn.execute(
-                        'SELECT id, quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
-                        (produto_id, almoxarifado_id)
-                    ).fetchone()
-
-                    if existente:
-                        conn.execute(
-                            'UPDATE estoque SET quantidade = quantidade + ?, updated_at = ? WHERE id = ?',
-                            (qtd, now_iso(), existente['id'])
-                        )
-                    else:
-                        conn.execute(
-                            'INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at) VALUES (?, ?, ?, 0, ?)',
-                            (produto_id, almoxarifado_id, qtd, now_iso())
-                        )
-
-                    # Registrar movimentação de entrada
-                    conn.execute('''
-                        INSERT INTO movimentacoes
-                            (produto_id, almoxarifado_id, tipo, quantidade,
-                             valor_unitario, documento, observacao)
-                        VALUES (?, ?, 'entrada', ?, 0, ?, ?)
-                    ''', (produto_id, almoxarifado_id, qtd,
-                          f'Recebimento Pedido #{id}',
-                          f'Entrada por recebimento de Pedido #{id}'))
-
-                current_user = get_jwt_identity()
-                user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-                registrar_log(
-                    user['id'], current_user, 'receber', 'pedidos',
-                    f'Pedido #{id} recebido no almoxarifado #{almoxarifado_id} com {len(itens)} itens',
-                    conn=conn
-                )
-
             # Mapa de timestamps
             ts_map = {
                 'em_compra': 'data_em_compra',
@@ -2946,16 +2726,13 @@ def avancar_status_pedido(id):
             coluna_ts = ts_map[novo_status]
             conn.execute(f'UPDATE pedidos SET status = ?, {coluna_ts} = ?, updated_at = ? WHERE id = ?',
                          (novo_status, now_iso(), now_iso(), id))
-
-            if novo_status != 'recebido':
-                current_user = get_jwt_identity()
-                user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
-                registrar_log(
-                    user['id'], current_user, 'atualizar', 'pedidos',
-                    f'Pedido #{id} alterado para {novo_status}',
-                    conn=conn
-                )
-
+            current_user = get_jwt_identity()
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            registrar_log(
+                user['id'], current_user, 'atualizar', 'pedidos',
+                f'Pedido #{id} alterado para {novo_status}',
+                conn=conn
+            )
             conn.commit()
         return response(True, message=f'Pedido alterado para "{novo_status}".')
     except Exception as e:

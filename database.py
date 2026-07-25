@@ -561,7 +561,7 @@ def _migrate_pedidos_compra(conn):
     """Migra dados da tabela antiga pedidos_compra para pedidos + pedidos_itens."""
     if not _table_exists(conn, 'pedidos_compra'):
         return
-    count = conn.execute('SELECT COUNT(*) FROM pedidos').fetchone()[0]
+    count = conn.execute('SELECT COUNT(*) as cnt FROM pedidos').fetchone()['cnt']
     if count > 0:
         return
     rows = conn.execute('''
