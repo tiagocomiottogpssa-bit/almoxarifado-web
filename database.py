@@ -597,20 +597,18 @@ def _migrate_pedidos_compra(conn):
 def _migrate_quantidade_transferida(conn):
     """
     Migration: adiciona coluna quantidade_transferida em pedidos_itens
-    para permitir transferência parcial de itens do pedido.
+    para permitir transferencia parcial de itens do pedido.
     """
-    try:
-        conn.execute('''
-            ALTER TABLE pedidos_itens 
+    if not _column_exists(conn, 'pedidos_itens', 'quantidade_transferida'):
+        conn.execute("""
+            ALTER TABLE pedidos_itens
             ADD COLUMN quantidade_transferida INTEGER DEFAULT 0
-        ''')
-        conn.commit()
+        """)
         print("Migration: coluna 'quantidade_transferida' adicionada em pedidos_itens.")
-    except Exception as e:
-        if 'duplicate column' in str(e).lower():
-            print("Migration: coluna 'quantidade_transferida' já existe.")
-        else:
-            print(f"Migration: erro ao adicionar coluna: {e}")
+    else:
+        print("Migration: coluna 'quantidade_transferida' ja existe.")
+
+
 
 def _create_transferencias(conn):
     conn.execute("""
