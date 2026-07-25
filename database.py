@@ -68,6 +68,10 @@ if USE_POSTGRES:
         def rollback(self):
             self._conn.rollback()
 
+        def execute(self, sql, params=None):
+            cur = self.cursor()
+            return cur.execute(sql, params)
+
         def close(self):
             self._conn.close()
 
