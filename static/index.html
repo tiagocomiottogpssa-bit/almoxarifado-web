@@ -2223,7 +2223,7 @@ function showSubtab(nome) {
         buttons[1].classList.add('active');
         loadEmprestimos();
         loadUnidadesSelectEmprestimo();
-        loadColaboradores();
+        loadColaboradoresDropdown();
         definirDataPadraoEmprestimo();
     }
 }
@@ -3751,7 +3751,7 @@ document.addEventListener('change', function(e) {
 });
 
 // Carrega colaboradores
-function loadColaboradores() {
+function loadColaboradoresDropdown() {
     fetch(`${API_BASE}/colaboradores`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
     })
@@ -3764,7 +3764,7 @@ function loadColaboradores() {
             select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
         });
     })
-    .catch(err => console.error('Erro ao carregar colaboradores:', err));
+        .catch(err => console.error('Erro ao carregar colaboradores dropdown:', err));
 }
 
 // Emprestar unidade
