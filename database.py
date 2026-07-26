@@ -185,6 +185,38 @@ def _copy_common_columns(conn, source, dest, columns):
 # CRIAÇÃO E MIGRAÇÃO DE TABELAS
 # ============================================================
 
+def _migrate_colaboradores_codigo_barras(conn):
+    """Adiciona coluna codigo_barras na tabela colaboradores para leitura via scanner."""
+    if not _column_exists(conn, 'colaboradores', 'codigo_barras'):
+        conn.execute("ALTER TABLE colaboradores ADD COLUMN codigo_barras TEXT UNIQUE")
+        print("Migração: coluna 'codigo_barras' adicionada à tabela colaboradores.")
+    conn.commit()
+
+def _migrate_produtos_natureza(conn):
+    """Adiciona coluna natureza na tabela produtos (consumivel / emprestimo)."""
+    if not _column_exists(conn, 'produtos', 'natureza'):
+        conn.execute(
+            "ALTER TABLE produtos ADD COLUMN natureza TEXT DEFAULT 'consumivel'"
+        )
+        print("Migração: coluna 'natureza' adicionada à tabela produtos.")
+    conn.commit()
+
+def _migrate_movimentacoes_checkout(conn):
+    """Adiciona colunas para controle de devolução na tabela movimentacoes."""
+    if not _column_exists(conn, 'movimentacoes', 'natureza'):
+        conn.execute(
+            "ALTER TABLE movimentacoes ADD COLUMN natureza TEXT DEFAULT 'consumivel'"
+        )
+    if not _column_exists(conn, 'movimentacoes', 'devolvido'):
+        conn.execute(
+            "ALTER TABLE movimentacoes ADD COLUMN devolvido BOOLEAN DEFAULT FALSE"
+        )
+    if not _column_exists(conn, 'movimentacoes', 'data_devolucao'):
+        conn.execute(
+            "ALTER TABLE movimentacoes ADD COLUMN data_devolucao TIMESTAMP"
+        )
+    conn.commit()
+
 def _migrate_produtos_sobressalente(conn):
     """Adiciona coluna sobressalente à tabela produtos."""
     if not _column_exists(conn, 'produtos', 'sobressalente'):
@@ -221,6 +253,9 @@ def init_db():
         _migrate_estoque_updated_at(conn)
         _migrate_colaboradores_matricula(conn)
         _migrate_emprestimos(conn)
+        _migrate_colaboradores_codigo_barras(conn)
+        _migrate_produtos_natureza(conn)
+        _migrate_movimentacoes_checkout(conn)
         _migrate_produtos_sobressalente(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)

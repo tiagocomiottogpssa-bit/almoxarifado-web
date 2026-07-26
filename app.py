@@ -2213,6 +2213,258 @@ def criar_movimentacao():
         return response(False, message=str(e), status_code=500)
 
 # ============================================================
+# MOVIMENTAÇÃO RÁPIDA (SCANNER)
+# ============================================================
+@app.route('/colaboradores/busca', methods=['GET'])
+@jwt_required()
+def buscar_colaborador_por_codigo():
+    codigo = request.args.get('codigo_barras', '').strip()
+    if not codigo:
+        return response(False, message='Informe o código de barras.', status_code=400)
+    try:
+        with get_connection() as conn:
+            row = conn.execute(
+                'SELECT id, nome, matricula, setor FROM colaboradores WHERE codigo_barras = ? AND ativo = 1',
+                (codigo,)
+            ).fetchone()
+            if not row:
+                return response(False, message='Colaborador não encontrado ou inativo.', status_code=404)
+            return response(True, data=dict(row))
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/produtos/busca', methods=['GET'])
+@jwt_required()
+def buscar_produto_por_codigo():
+    codigo = request.args.get('codigo', '').strip()
+    if not codigo:
+        return response(False, message='Informe o código do produto.', status_code=400)
+    try:
+        with get_connection() as conn:
+            row = conn.execute('''
+                SELECT p.id, p.nome, p.codigo_interno, p.categoria, p.natureza,
+                       p.custo_medio,
+                       COALESCE(SUM(e.quantidade), 0) AS quantidade_estoque
+                FROM produtos p
+                LEFT JOIN estoque e ON e.produto_id = p.id
+                WHERE p.codigo_interno = ? AND p.ativo = 1
+                GROUP BY p.id
+                LIMIT 1
+            ''', (codigo,)).fetchone()
+            if not row:
+                return response(False, message='Produto não encontrado ou inativo.', status_code=404)
+            return response(True, data=dict(row))
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/movimentacoes/retirada-rapida', methods=['POST'])
+@jwt_required()
+def retirada_rapida():
+    data = request.get_json(silent=True) or {}
+    colaborador_id = data.get('colaborador_id')
+    almoxarifado_id = data.get('almoxarifado_id')
+    itens = data.get('itens', [])
+    if not colaborador_id or not itens:
+        return response(False, message='colaborador_id e itens são obrigatórios.', status_code=400)
+    if not almoxarifado_id:
+        # Pega o primeiro almoxarifado como padrão
+        with get_connection() as conn:
+            row = conn.execute('SELECT id FROM almoxarifados ORDER BY id LIMIT 1').fetchone()
+            if row:
+                almoxarifado_id = row['id']
+            else:
+                return response(False, message='Nenhum almoxarifado cadastrado.', status_code=400)
+    current_user = get_jwt_identity()
+    try:
+        with get_connection() as conn:
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            colaborador = conn.execute('SELECT nome FROM colaboradores WHERE id = ?', (colaborador_id,)).fetchone()
+            if not colaborador:
+                return response(False, message='Colaborador não encontrado.', status_code=404)
+
+            resultados = []
+            itens_inseridos = 0
+
+            for item in itens:
+                produto_id = item.get('produto_id')
+                quantidade = item.get('quantidade', 1)
+                if not produto_id:
+                    continue
+
+                produto = conn.execute(
+                    'SELECT nome, natureza, custo_medio FROM produtos WHERE id = ?',
+                    (produto_id,)
+                ).fetchone()
+                if not produto:
+                    continue
+
+                natureza = produto['natureza'] or 'consumivel'
+                valor_unitario = produto['custo_medio'] or 0
+
+                # Verifica saldo
+                saldo_row = conn.execute(
+                    'SELECT quantidade FROM estoque WHERE produto_id = ? AND almoxarifado_id = ?',
+                    (produto_id, almoxarifado_id)
+                ).fetchone()
+                saldo = saldo_row['quantidade'] if saldo_row else 0
+                if saldo < quantidade:
+                    return response(
+                        False,
+                        message=f'Saldo insuficiente de "{produto["nome"]}": disponível {saldo}, solicitado {quantidade}.',
+                        status_code=409
+                    )
+
+                # Insere movimentação
+                conn.execute('''
+                    INSERT INTO movimentacoes
+                        (produto_id, almoxarifado_id, colaborador_id, tipo, quantidade,
+                         valor_unitario, natureza, devolvido)
+                    VALUES (?, ?, ?, 'saida', ?, ?, ?, ?)
+                ''', (produto_id, almoxarifado_id, colaborador_id, quantidade,
+                      valor_unitario, natureza, False))
+
+                # Atualiza estoque
+                conn.execute(
+                    'UPDATE estoque SET quantidade = quantidade - ? WHERE produto_id = ? AND almoxarifado_id = ?',
+                    (quantidade, produto_id, almoxarifado_id)
+                )
+
+                resultados.append({
+                    'produto_id': produto_id,
+                    'produto_nome': produto['nome'],
+                    'natureza': natureza,
+                    'quantidade': quantidade
+                })
+                itens_inseridos += 1
+
+            # Log
+            if user and itens_inseridos > 0:
+                registrar_log(
+                    user['id'], current_user, 'saida', 'retirada_rapida',
+                    f'Retirada rápida de {itens_inseridos} item(ns) por "{colaborador["nome"]}"',
+                    conn=conn
+                )
+
+            conn.commit()
+
+        return response(
+            True,
+            data={'itens': resultados, 'total_itens': itens_inseridos},
+            message=f'{itens_inseridos} item(ns) retirado(s) com sucesso.'
+        )
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/movimentacoes/devolucao-rapida', methods=['POST'])
+@jwt_required()
+def devolucao_rapida():
+    data = request.get_json(silent=True) or {}
+    colaborador_id = data.get('colaborador_id')
+    produto_id = data.get('produto_id')
+    quantidade = data.get('quantidade', 1)
+    almoxarifado_id = data.get('almoxarifado_id')
+
+    if not colaborador_id or not produto_id:
+        return response(False, message='colaborador_id e produto_id são obrigatórios.', status_code=400)
+
+    try:
+        with get_connection() as conn:
+            # Localiza movimentação em aberto (não devolvida)
+            mov = conn.execute('''
+                SELECT m.id, m.natureza, m.quantidade
+                FROM movimentacoes m
+                WHERE m.colaborador_id = ?
+                  AND m.produto_id = ?
+                  AND m.tipo = 'saida'
+                  AND m.natureza = 'emprestimo'
+                  AND m.devolvido = FALSE
+                ORDER BY m.data DESC
+                LIMIT 1
+            ''', (colaborador_id, produto_id)).fetchone()
+
+            if not mov:
+                return response(
+                    False,
+                    message='Nenhum empréstimo pendente encontrado para este colaborador/produto.',
+                    status_code=404
+                )
+
+            if not almoxarifado_id:
+                row = conn.execute('SELECT id FROM almoxarifados ORDER BY id LIMIT 1').fetchone()
+                almoxarifado_id = row['id'] if row else None
+
+            current_user = get_jwt_identity()
+            user = conn.execute('SELECT id FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            produto = conn.execute('SELECT nome FROM produtos WHERE id = ?', (produto_id,)).fetchone()
+
+            # Marca como devolvido
+            conn.execute('''
+                UPDATE movimentacoes
+                SET devolvido = TRUE, data_devolucao = ?
+                WHERE id = ?
+            ''', (now_iso(), mov['id']))
+
+            # Registra entrada de devolução no estoque
+            if almoxarifado_id:
+                conn.execute(
+                    '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade)
+                       VALUES (?, ?, ?)
+                       ON CONFLICT(produto_id, almoxarifado_id)
+                       DO UPDATE SET quantidade = estoque.quantidade + excluded.quantidade''',
+                    (produto_id, almoxarifado_id, quantidade)
+                )
+
+                # Também registra como movimentação de entrada (para o histórico)
+                conn.execute('''
+                    INSERT INTO movimentacoes
+                        (produto_id, almoxarifado_id, colaborador_id, tipo, quantidade,
+                         valor_unitario, natureza, devolvido, observacao)
+                    VALUES (?, ?, ?, 'entrada', ?, ?, 'emprestimo', TRUE, ?)
+                ''', (produto_id, almoxarifado_id, colaborador_id, quantidade,
+                      0, f'Devolução do empréstimo #{mov["id"]}'))
+
+            # Log
+            if user and produto:
+                registrar_log(
+                    user['id'], current_user, 'entrada', 'devolucao_rapida',
+                    f'Devolução de {quantidade} un de "{produto["nome"]}" pelo colaborador',
+                    conn=conn
+                )
+
+            conn.commit()
+
+        return response(
+            True,
+            data={'movimentacao_original_id': mov['id']},
+            message='Devolução registrada com sucesso.'
+        )
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/movimentacoes/pendencias', methods=['GET'])
+@jwt_required()
+def listar_pendencias():
+    colaborador_id = request.args.get('colaborador_id')
+    if not colaborador_id:
+        return response(False, message='colaborador_id é obrigatório.', status_code=400)
+    try:
+        with get_connection() as conn:
+            rows = conn.execute('''
+                SELECT m.id, m.produto_id, m.quantidade, m.data as data_retirada,
+                       p.nome AS produto_nome, p.codigo_interno
+                FROM movimentacoes m
+                LEFT JOIN produtos p ON m.produto_id = p.id
+                WHERE m.colaborador_id = ?
+                  AND m.tipo = 'saida'
+                  AND m.natureza = 'emprestimo'
+                  AND m.devolvido = FALSE
+                ORDER BY m.data DESC
+            ''', (colaborador_id,)).fetchall()
+        return response(True, data=rows_to_dict(rows))
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+# ============================================================
 # EMPRÉSTIMOS
 # ============================================================
 @app.route('/emprestimos', methods=['GET'])

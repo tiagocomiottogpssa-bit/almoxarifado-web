@@ -214,6 +214,7 @@ th, td {
         <div class="sidebar-nav">
             <button class="sidebar-item active" data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
             <button class="sidebar-item" data-tab="movimentacoes" onclick="showTab('movimentacoes')">🔄 Movimentações</button>
+            <button class="sidebar-item" data-tab="movimentacao-rapida" onclick="showTab('movimentacao-rapida')">⚡ Mov. Rápida</button>
             <button class="sidebar-item" data-tab="estoque" onclick="showTab('estoque')">🗄️ Estoque</button>
             <button class="sidebar-item" data-tab="relatorios" onclick="showTab('relatorios')">📊 Relatórios</button>
             <button class="sidebar-item" data-tab="pedidos" onclick="showTab('pedidos')">🛒 Pedidos</button>
@@ -1416,6 +1417,87 @@ th, td {
         </div>
     </div>
 </div>
+
+<!-- Movimentação Rápida (Scanner) -->
+<div id="tab-movimentacao-rapida" class="tab-content hidden">
+    <div class="card">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+            <span style="font-size: 28px;">⚡</span>
+            <h2 style="margin: 0; font-size: 22px; color: #1f2937; font-weight: 700;">MOVIMENTAÇÃO RÁPIDA</h2>
+        </div>
+
+        <!-- Modo: Retirada ou Devolução -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+            <button id="btn-modo-retirada" class="btn-success" onclick="setModo('retirada')" style="flex:1;padding:14px;font-size:16px;font-weight:700;">📤 RETIRADA</button>
+            <button id="btn-modo-devolucao" class="btn-secondary" onclick="setModo('devolucao')" style="flex:1;padding:14px;font-size:16px;font-weight:700;">📥 DEVOLUÇÃO</button>
+        </div>
+
+        <!-- Status / Instruções -->
+        <div id="rapid-status" style="padding:12px;border-radius:8px;margin-bottom:16px;font-size:14px;display:none;"></div>
+
+        <!-- Leitura do Colaborador -->
+        <div class="card" style="background:#f9fafb;padding:16px;margin-bottom:16px;">
+            <label style="font-size:14px;font-weight:700;display:block;margin-bottom:8px;">👤 Colaborador</label>
+            <div style="display:flex;gap:12px;align-items:center;">
+                <input type="text" id="input-codigo-colaborador"
+                       placeholder="Leia a crachá ou digite o código..."
+                       style="flex:1;padding:12px;font-size:16px;border:2px solid #d1d5db;border-radius:8px;text-align:center;font-weight:600;letter-spacing:2px;"
+                       autofocus>
+                <button onclick="buscarColaborador()" style="padding:12px 20px;">🔍 Buscar</button>
+            </div>
+            <div id="colaborador-info" style="margin-top:8px;padding:8px 12px;border-radius:6px;display:none;"></div>
+        </div>
+
+        <!-- Leitura do Produto -->
+        <div class="card" style="background:#f9fafb;padding:16px;margin-bottom:16px;">
+            <label style="font-size:14px;font-weight:700;display:block;margin-bottom:8px;">📦 Produto</label>
+            <div style="display:flex;gap:12px;align-items:center;">
+                <input type="text" id="input-codigo-produto"
+                       placeholder="Leia o código de barras do produto..."
+                       style="flex:1;padding:12px;font-size:16px;border:2px solid #d1d5db;border-radius:8px;text-align:center;font-weight:600;letter-spacing:2px;">
+                <button onclick="buscarProdutoRapido()" style="padding:12px 20px;">🔍 Buscar</button>
+            </div>
+            <div id="produto-info" style="margin-top:8px;padding:8px 12px;border-radius:6px;display:none;"></div>
+            <div id="produto-acoes" style="margin-top:12px;display:none;">
+                <div style="display:flex;gap:12px;align-items:center;">
+                    <label>Qtd:</label>
+                    <input type="number" id="rapid-qtd" value="1" min="1" style="width:80px;padding:8px;font-size:16px;text-align:center;">
+                    <button class="btn-success" onclick="adicionarItemRetirada()" id="btn-adicionar-item" style="padding:10px 24px;">➕ Adicionar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Itens da retirada atual -->
+        <div class="card" style="padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:16px;">📋 Itens desta retirada</h3>
+                <span id="rapid-contador" style="font-size:13px;color:#6b7280;">0 itens</span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Produto</th>
+                            <th>Natureza</th>
+                            <th style="text-align:center;">Qtd</th>
+                            <th style="text-align:center;">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rapid-itens-tbody"></tbody>
+                </table>
+            </div>
+            <div id="rapid-vazio" style="text-align:center;padding:24px;color:#9ca3af;font-size:14px;">
+                Nenhum item adicionado ainda. Leia os produtos acima.
+            </div>
+            <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
+                <button class="btn-secondary" onclick="limparRetirada()">🗑️ Limpar</button>
+                <button class="btn-success" id="btn-finalizar-retirada" onclick="finalizarRetirada()" disabled style="padding:12px 32px;font-size:15px;font-weight:700;">✅ Finalizar Retirada</button>
+            </div>
+        </div>
+    </div>
+</div>
+
     </div>  <!-- fecha main-content -->
 </div>      <!-- fecha app-section -->
         </div>
@@ -2206,6 +2288,11 @@ function showTab(tabName) {
 
     if (tabName === 'auditoria') {
         loadAuditoria();
+        return;
+    }
+
+    if (tabName === 'movimentacao-rapida') {
+        limparRetirada();
         return;
     }
 
@@ -5230,6 +5317,277 @@ async function confirmarTransferencia() {
         document.getElementById('btn-confirmar-transferencia').textContent = 'Confirmar Transferência';
     }
 }
+
+// ============================================================
+// MOVIMENTAÇÃO RÁPIDA (SCANNER)
+// ============================================================
+let modoRapido = 'retirada';
+let colaboradorRapido = null;
+let itensRapido = [];
+
+function setModo(modo) {
+    modoRapido = modo;
+    document.getElementById('btn-modo-retirada').className = modo === 'retirada' ? 'btn-success' : 'btn-secondary';
+    document.getElementById('btn-modo-devolucao').className = modo === 'devolucao' ? 'btn-success' : 'btn-secondary';
+    limparRetirada();
+    document.getElementById('input-codigo-colaborador').focus();
+    showRapidMessage('', '');
+}
+
+function showRapidMessage(msg, type) {
+    const el = document.getElementById('rapid-status');
+    if (!msg) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.className = type === 'success' ? 'alert-success' : type === 'error' ? 'alert-error' : '';
+    el.textContent = msg;
+}
+
+async function buscarColaborador() {
+    const codigo = document.getElementById('input-codigo-colaborador').value.trim();
+    if (!codigo) { showRapidMessage('Informe o código da crachá.', 'error'); return; }
+    try {
+        const res = await fetch(`${API_BASE}/colaboradores/busca?codigo_barras=${encodeURIComponent(codigo)}`, { headers: authHeaders() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (data.success) {
+            colaboradorRapido = data.data;
+            const info = document.getElementById('colaborador-info');
+            info.style.display = 'block';
+            info.innerHTML = `<span style="font-weight:700;color:#059669;">✅ ${data.data.nome}</span>` +
+                (data.data.matricula ? ` <span style="color:#6b7280;">| Mat: ${data.data.matricula}</span>` : '') +
+                (data.data.setor ? ` <span style="color:#6b7280;">| ${data.data.setor}</span>` : '');
+            document.getElementById('input-codigo-produto').focus();
+            showRapidMessage('', '');
+            if (modoRapido === 'devolucao') {
+                document.getElementById('produto-acoes').style.display = 'none';
+            }
+        } else {
+            showRapidMessage('Colaborador não encontrado. Verifique o código.', 'error');
+            colaboradorRapido = null;
+        }
+    } catch (err) {
+        showRapidMessage('Erro ao buscar colaborador: ' + err.message, 'error');
+    }
+}
+
+async function buscarProdutoRapido() {
+    const codigo = document.getElementById('input-codigo-produto').value.trim();
+    if (!codigo) { showRapidMessage('Informe o código do produto.', 'error'); return; }
+    if (!colaboradorRapido) { showRapidMessage('Identifique o colaborador primeiro.', 'error'); return; }
+    try {
+        const res = await fetch(`${API_BASE}/produtos/busca?codigo=${encodeURIComponent(codigo)}`, { headers: authHeaders() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (data.success) {
+            const p = data.data;
+            const info = document.getElementById('produto-info');
+            info.style.display = 'block';
+            const naturezaIcon = p.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível';
+            const naturezaCor = p.natureza === 'emprestimo' ? '#d97706' : '#059669';
+            info.innerHTML = `<div><strong>${p.nome}</strong></div>
+                <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
+                    <span>Cód: ${p.codigo_interno || '-'}</span>
+                    <span>Estoque: <strong>${p.quantidade_estoque}</strong></span>
+                    <span style="color:${naturezaCor};font-weight:600;">${naturezaIcon}</span>
+                </div>`;
+
+            if (modoRapido === 'retirada') {
+                const acoes = document.getElementById('produto-acoes');
+                acoes.style.display = 'block';
+                document.getElementById('rapid-qtd').value = 1;
+                document.getElementById('rapid-qtd').max = p.quantidade_estoque;
+                document.getElementById('btn-adicionar-item').onclick = () => adicionarItemRetirada(p);
+                document.getElementById('rapid-qtd').focus();
+                document.getElementById('rapid-qtd').select();
+            } else {
+                // Devolução - busca pendências
+                document.getElementById('produto-acoes').style.display = 'none';
+                await devolverItem(p.id);
+            }
+        } else {
+            showRapidMessage('Produto não encontrado.', 'error');
+        }
+    } catch (err) {
+        showRapidMessage('Erro ao buscar produto: ' + err.message, 'error');
+    }
+}
+
+function adicionarItemRetirada(produto) {
+    if (!produto) {
+        // Tenta pegar do último produto buscado
+        const infoText = document.getElementById('produto-info').innerText;
+        showRapidMessage('Leia o produto novamente.', 'error');
+        return;
+    }
+    const qtd = parseInt(document.getElementById('rapid-qtd').value) || 1;
+    if (qtd <= 0) { showRapidMessage('Quantidade inválida.', 'error'); return; }
+
+    // Verifica se já existe
+    const existente = itensRapido.find(i => i.produto_id === produto.id);
+    if (existente) {
+        existente.quantidade += qtd;
+    } else {
+        itensRapido.push({
+            produto_id: produto.id,
+            produto_nome: produto.nome,
+            codigo_interno: produto.codigo_interno,
+            natureza: produto.natureza || 'consumivel',
+            quantidade: qtd
+        });
+    }
+
+    renderItensRapido();
+    document.getElementById('input-codigo-produto').value = '';
+    document.getElementById('input-codigo-produto').focus();
+    document.getElementById('produto-info').style.display = 'none';
+    document.getElementById('produto-acoes').style.display = 'none';
+    showRapidMessage(`✅ ${qtd}x ${produto.nome} adicionado!`, 'success');
+    setTimeout(() => showRapidMessage('', ''), 2000);
+}
+
+function renderItensRapido() {
+    const tbody = document.getElementById('rapid-itens-tbody');
+    const vazio = document.getElementById('rapid-vazio');
+    const contador = document.getElementById('rapid-contador');
+    const btnFinalizar = document.getElementById('btn-finalizar-retirada');
+
+    tbody.innerHTML = '';
+    if (itensRapido.length === 0) {
+        vazio.style.display = 'block';
+        contador.textContent = '0 itens';
+        btnFinalizar.disabled = true;
+        return;
+    }
+
+    vazio.style.display = 'none';
+    contador.textContent = `${itensRapido.length} item(ns)`;
+    btnFinalizar.disabled = false;
+
+    itensRapido.forEach((item, idx) => {
+        const naturezaIcon = item.natureza === 'emprestimo' ? '🔄' : '✅';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.codigo_interno || '-'}</td>
+            <td>${item.produto_nome}</td>
+            <td>${naturezaIcon} ${item.natureza === 'emprestimo' ? 'Empréstimo' : 'Consumível'}</td>
+            <td style="text-align:center;font-weight:700;">${item.quantidade}</td>
+            <td style="text-align:center;">
+                <button class="btn-sm btn-danger" onclick="removerItemRapido(${idx})">✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function removerItemRapido(idx) {
+    itensRapido.splice(idx, 1);
+    renderItensRapido();
+}
+
+async function finalizarRetirada() {
+    if (itensRapido.length === 0) { showRapidMessage('Nenhum item para retirar.', 'error'); return; }
+    if (!colaboradorRapido) { showRapidMessage('Colaborador não identificado.', 'error'); return; }
+
+    const btn = document.getElementById('btn-finalizar-retirada');
+    btn.disabled = true;
+    btn.textContent = '⏳ Registrando...';
+
+    try {
+        const res = await fetch(`${API_BASE}/movimentacoes/retirada-rapida`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify({
+                colaborador_id: colaboradorRapido.id,
+                itens: itensRapido.map(i => ({
+                    produto_id: i.produto_id,
+                    quantidade: i.quantidade
+                }))
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showRapidMessage(`✅ ${data.message}`, 'success');
+            btn.textContent = '✅ Finalizado!';
+            // Mostra resumo
+            let resumo = data.data.itens.map(i =>
+                `${i.quantidade}x ${i.produto_nome} (${i.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível'})`
+            ).join('\n');
+            alert(`Retirada concluída para ${colaboradorRapido.nome}:\n\n${resumo}`);
+            limparRetirada();
+        } else {
+            showRapidMessage('Erro: ' + data.message, 'error');
+            btn.disabled = false;
+            btn.textContent = '✅ Finalizar Retirada';
+        }
+    } catch (err) {
+        showRapidMessage('Erro: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = '✅ Finalizar Retirada';
+    }
+}
+
+async function devolverItem(produtoId) {
+    if (!colaboradorRapido) { showRapidMessage('Identifique o colaborador primeiro.', 'error'); return; }
+
+    try {
+        const res = await fetch(`${API_BASE}/movimentacoes/devolucao-rapida`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify({
+                colaborador_id: colaboradorRapido.id,
+                produto_id: produtoId,
+                quantidade: 1
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showRapidMessage(`✅ Devolução registrada com sucesso!`, 'success');
+            document.getElementById('input-codigo-produto').value = '';
+            document.getElementById('input-codigo-produto').focus();
+            document.getElementById('produto-info').style.display = 'none';
+        } else {
+            showRapidMessage('Erro: ' + data.message, 'error');
+        }
+    } catch (err) {
+        showRapidMessage('Erro: ' + err.message, 'error');
+    }
+}
+
+function limparRetirada() {
+    itensRapido = [];
+    colaboradorRapido = null;
+    document.getElementById('input-codigo-colaborador').value = '';
+    document.getElementById('input-codigo-produto').value = '';
+    document.getElementById('colaborador-info').style.display = 'none';
+    document.getElementById('produto-info').style.display = 'none';
+    document.getElementById('produto-acoes').style.display = 'none';
+    document.getElementById('btn-finalizar-retirada').disabled = true;
+    document.getElementById('btn-finalizar-retirada').textContent = '✅ Finalizar Retirada';
+    renderItensRapido();
+    showRapidMessage('', '');
+    document.getElementById('input-codigo-colaborador').focus();
+}
+
+// Enter nos campos de scanner
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        const active = document.activeElement;
+        if (active && active.id === 'input-codigo-colaborador') {
+            e.preventDefault();
+            buscarColaborador();
+        } else if (active && active.id === 'input-codigo-produto') {
+            e.preventDefault();
+            buscarProdutoRapido();
+        }
+    }
+});
+
 </script>
 
 </body>
