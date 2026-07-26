@@ -12,6 +12,11 @@ import openpyxl
 from io import BytesIO
 import tempfile
 import math
+import barcode
+from barcode.writer import ImageWriter
+import io
+from flask import send_file
+
 
 from database import get_connection, init_db, calcular_vlc_total, USE_POSTGRES
 
@@ -2211,6 +2216,95 @@ def criar_movimentacao():
         import traceback
         traceback.print_exc()
         return response(False, message=str(e), status_code=500)
+
+@app.route('/produtos/<int:id>/codigo-barras', methods=['GET'])
+@jwt_required()
+def gerar_codigo_barras(id):
+    try:
+        with get_connection() as conn:
+            produto = conn.execute(
+                'SELECT codigo_interno, nome FROM produtos WHERE id = ? AND ativo = 1',
+                (id,)
+            ).fetchone()
+            if not produto:
+                return response(False, message='Produto não encontrado.', status_code=404)
+
+            codigo = produto['codigo_interno']
+            if not codigo:
+                return response(False, message='Produto sem código interno.', status_code=400)
+
+            # Gera o código de barras no formato CODE128
+            CODE128 = barcode.get_barcode_class('code128')
+            codigo_barras = CODE128(codigo, writer=ImageWriter())
+
+            # Salva em memória
+            buf = io.BytesIO()
+            codigo_barras.write(buf)
+            buf.seek(0)
+
+            return send_file(buf, mimetype='image/png')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/produtos/<int:id>/etiqueta', methods=['GET'])
+@jwt_required()
+def etiqueta_produto(id):
+    try:
+        with get_connection() as conn:
+            produto = conn.execute(
+                'SELECT codigo_interno, nome, unidade FROM produtos WHERE id = ? AND ativo = 1',
+                (id,)
+            ).fetchone()
+            if not produto:
+                return '<h2>Produto não encontrado</h2>', 404
+
+            codigo = produto['codigo_interno'] or 'SEMCODIGO'
+            nome = produto['nome'] or 'Sem nome'
+            unidade = produto['unidade'] or ''
+
+            html = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Etiqueta - {nome}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: Arial, sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; min-height: 100vh; padding: 20px;
+        }}
+        .etiqueta {{
+            width: 280px; padding: 16px; border: 2px solid #333;
+            border-radius: 8px; text-align: center; background: #fff;
+        }}
+        .etiqueta img {{ width: 220px; height: auto; margin-bottom: 8px; }}
+        .etiqueta .nome {{ font-size: 14px; font-weight: bold; margin-bottom: 4px; }}
+        .etiqueta .info {{ font-size: 12px; color: #555; }}
+        .btn-imprimir {{
+            margin-top: 20px; padding: 12px 24px; font-size: 16px;
+            cursor: pointer; background: #2563eb; color: #fff;
+            border: none; border-radius: 6px;
+        }}
+        @media print {{
+            .btn-imprimir {{ display: none; }}
+            body {{ padding: 0; }}
+            .etiqueta {{ border: 1px solid #000; }}
+        }}
+    </style>
+</head>
+<body>
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Etiqueta</button>
+    <div class="etiqueta">
+        <img src="/produtos/{id}/codigo-barras" alt="Código de Barras">
+        <div class="nome">{nome}</div>
+        <div class="info">Cód: {codigo} | {unidade}</div>
+    </div>
+</body>
+</html>'''
+            return html
+    except Exception as e:
+        return f'<h2>Erro: {str(e)}</h2>', 500
 
 # ============================================================
 # MOVIMENTAÇÃO RÁPIDA (SCANNER)
