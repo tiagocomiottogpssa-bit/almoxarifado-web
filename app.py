@@ -2229,7 +2229,7 @@ def gerar_codigo_barras(id):
     try:
         with get_connection() as conn:
             produto = conn.execute(
-                'SELECT codigo_interno, nome FROM produtos WHERE id = ? AND ativo = 1',
+                'SELECT codigo_interno, nome FROM produtos WHERE id = ?',
                 (id,)
             ).fetchone()
             if not produto:
@@ -2264,7 +2264,7 @@ def etiqueta_produto(id):
     try:
         with get_connection() as conn:
             produto = conn.execute(
-                'SELECT codigo_interno, nome, unidade FROM produtos WHERE id = ? AND ativo = 1',
+                'SELECT codigo_interno, nome, unidade FROM produtos WHERE id = ?',
                 (id,)
             ).fetchone()
             if not produto:
