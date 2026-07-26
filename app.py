@@ -1,6 +1,6 @@
 ﻿from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
@@ -2218,8 +2218,14 @@ def criar_movimentacao():
         return response(False, message=str(e), status_code=500)
 
 @app.route('/produtos/<int:id>/codigo-barras', methods=['GET'])
-@jwt_required()
 def gerar_codigo_barras(id):
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return {"msg": "Cabeçalho de autorização ausente"}, 401
+    try:
+        decode_token(token)
+    except Exception:
+        return {"msg": "Token inválido ou expirado"}, 401
     try:
         with get_connection() as conn:
             produto = conn.execute(
@@ -2247,8 +2253,14 @@ def gerar_codigo_barras(id):
         return response(False, message=str(e), status_code=500)
 
 @app.route('/produtos/<int:id>/etiqueta', methods=['GET'])
-@jwt_required()
 def etiqueta_produto(id):
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return '<h2>Token ausente</h2>', 401
+    try:
+        decode_token(token)
+    except Exception:
+        return '<h2>Token inválido ou expirado</h2>', 401
     try:
         with get_connection() as conn:
             produto = conn.execute(

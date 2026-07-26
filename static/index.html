@@ -2911,7 +2911,7 @@ function renderProdutos() {
                     <td style="text-align: center;">${p.sobressalente ? '✅' : '—'}</td>
                     <td style="text-align: center;">
                         <button onclick="editarProduto(${p.id})" class="btn-sm" title="Editar">✏️</button>
-                        <button onclick="window.open('/produtos/${p.id}/etiqueta', '_blank')" class="btn-sm" title="Imprimir Etiqueta">🏷️</button>
+                        <button onclick="window.open('/produtos/${p.id}/etiqueta?token=' + localStorage.getItem('access_token'), '_blank')" class="btn-sm" title="Imprimir Etiqueta">🏷️</button>
                         <button onclick="excluirProduto(${p.id})" class="btn-sm btn-danger" title="Excluir">🗑️</button>
                     </td>
                 </tr>
