@@ -2219,13 +2219,6 @@ def criar_movimentacao():
 
 @app.route('/produtos/<int:id>/codigo-barras', methods=['GET'])
 def gerar_codigo_barras(id):
-    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
-    if not token:
-        return {"msg": "Cabeçalho de autorização ausente"}, 401
-    try:
-        decode_token(token)
-    except Exception:
-        return {"msg": "Token inválido ou expirado"}, 401
     try:
         with get_connection() as conn:
             produto = conn.execute(
