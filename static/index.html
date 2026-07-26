@@ -1435,6 +1435,14 @@ th, td {
         <!-- Status / Instruções -->
         <div id="rapid-status" style="padding:12px;border-radius:8px;margin-bottom:16px;font-size:14px;display:none;"></div>
 
+        <!-- Seletor de Almoxarifado -->
+        <div class="card" style="background:#f9fafb;padding:16px;margin-bottom:16px;">
+            <label style="font-size:14px;font-weight:700;display:block;margin-bottom:8px;">🏭 Almoxarifado</label>
+            <select id="rapid-almoxarifado" style="width:100%;padding:12px;font-size:16px;border:2px solid #d1d5db;border-radius:8px;">
+                <option value="">Selecione o almoxarifado...</option>
+            </select>
+        </div>
+
         <!-- Leitura do Colaborador -->
         <div class="card" style="background:#f9fafb;padding:16px;margin-bottom:16px;">
             <label style="font-size:14px;font-weight:700;display:block;margin-bottom:8px;">👤 Colaborador</label>
@@ -2293,6 +2301,7 @@ function showTab(tabName) {
 
     if (tabName === 'movimentacao-rapida') {
         limparRetirada();
+        carregarAlmoxarifadosRapido();
         return;
     }
 
@@ -5501,12 +5510,20 @@ async function finalizarRetirada() {
             },
             body: JSON.stringify({
                 colaborador_id: colaboradorRapido.id,
+                almoxarifado_id: parseInt(almoxarifadoId),
                 itens: itensRapido.map(i => ({
                     produto_id: i.produto_id,
                     quantidade: i.quantidade
                 }))
             })
         });
+        const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
+        if (!almoxarifadoId) {
+            showRapidMessage('Selecione o almoxarifado de origem.', 'error');
+            btn.disabled = false;
+            btn.textContent = '✅ Finalizar Retirada';
+            return;
+        }
         const data = await res.json();
         if (data.success) {
             showRapidMessage(`✅ ${data.message}`, 'success');
@@ -5542,9 +5559,15 @@ async function devolverItem(produtoId) {
             body: JSON.stringify({
                 colaborador_id: colaboradorRapido.id,
                 produto_id: produtoId,
-                quantidade: 1
+                quantidade: 1,
+                almoxarifado_id: parseInt(almoxarifadoId)
             })
         });
+        const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
+        if (!almoxarifadoId) {
+            showRapidMessage('Selecione o almoxarifado para devolução.', 'error');
+            return;
+        }
         const data = await res.json();
         if (data.success) {
             showRapidMessage(`✅ Devolução registrada com sucesso!`, 'success');
@@ -5560,6 +5583,8 @@ async function devolverItem(produtoId) {
 }
 
 function limparRetirada() {
+    const selAlmox = document.getElementById('rapid-almoxarifado');
+    if (selAlmox) selAlmox.value = '';
     itensRapido = [];
     colaboradorRapido = null;
     document.getElementById('input-codigo-colaborador').value = '';
@@ -5587,6 +5612,26 @@ document.addEventListener('keydown', function(e) {
         }
     }
 });
+
+async function carregarAlmoxarifadosRapido() {
+    try {
+        const res = await fetch(`${API_BASE}/almoxarifados`, { headers: authHeaders() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        const select = document.getElementById('rapid-almoxarifado');
+        select.innerHTML = '<option value="">Selecione o almoxarifado...</option>';
+        if (data.success && data.data) {
+            data.data.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.id;
+                opt.textContent = a.nome;
+                select.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error('Erro ao carregar almoxarifados:', err);
+    }
+}
 
 </script>
 
