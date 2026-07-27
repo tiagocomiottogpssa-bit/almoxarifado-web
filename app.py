@@ -16,7 +16,7 @@ import barcode
 from barcode.writer import ImageWriter
 import io
 from flask import send_file
-
+from markupsafe import escape
 
 from database import get_connection, init_db, calcular_vlc_total, USE_POSTGRES
 
@@ -2244,6 +2244,72 @@ def gerar_codigo_barras(id):
             return send_file(buf, mimetype='image/png')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
+
+from markupsafe import escape  # já deve estar no topo, se não estiver, adicione
+
+@app.route('/produtos/etiquetas/lote', methods=['GET'])
+def etiquetas_lote():
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return '<h2>Token ausente</h2>', 401
+    try:
+        decode_token(token)
+    except Exception:
+        return '<h2>Token inválido ou expirado</h2>', 401
+    
+    ids = request.args.get('ids', '')
+    if not ids:
+        return '<h2>Nenhum produto selecionado</h2>', 400
+    
+    lista_ids = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+    if not lista_ids:
+        return '<h2>IDs inválidos</h2>', 400
+    
+    placeholders = ','.join(['?'] * len(lista_ids))
+    
+    with get_connection() as conn:
+        produtos = conn.execute(
+            f'SELECT id, codigo_interno, nome, unidade FROM produtos WHERE id IN ({placeholders})',
+            lista_ids
+        ).fetchall()
+    
+    if not produtos:
+        return '<h2>Nenhum produto encontrado</h2>', 404
+    
+    etiquetas_html = ''
+    for p in produtos:
+        codigo = p['codigo_interno'] or 'SEMCODIGO'
+        nome = p['nome'] or 'Sem nome'
+        unidade = p['unidade'] or ''
+        etiquetas_html += f'''
+        <div class="etiqueta">
+            <img src="/produtos/{p['id']}/codigo-barras" alt="Código de Barras">
+            <div class="nome">{escape(nome)}</div>
+            <div class="info">Cód: {escape(codigo)} | {escape(unidade)}</div>
+        </div>'''
+    
+    html = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8"><title>Etiquetas em Lote</title>
+    <style>
+        * {{ margin:0; padding:0; box-sizing:border-box; }}
+        body {{ font-family:Arial,sans-serif; padding:20px; }}
+        .etiqueta-container {{ display:flex; flex-wrap:wrap; gap:16px; justify-content:center; }}
+        .etiqueta {{ width:280px; padding:16px; border:2px solid #333; border-radius:8px; text-align:center; background:#fff; page-break-inside:avoid; }}
+        .etiqueta img {{ width:220px; height:auto; margin-bottom:8px; }}
+        .etiqueta .nome {{ font-size:14px; font-weight:bold; margin-bottom:4px; }}
+        .etiqueta .info {{ font-size:12px; color:#555; }}
+        .btn-imprimir {{ display:block; margin:0 auto 20px; padding:12px 24px; font-size:16px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; }}
+        @media print {{ .btn-imprimir {{ display:none; }} .etiqueta {{ border:1px solid #000; }} }}
+    </style>
+</head>
+<body>
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Todas</button>
+    <div class="etiqueta-container">{etiquetas_html}</div>
+</body>
+</html>'''
+    return html
 
 @app.route('/produtos/<int:id>/etiqueta', methods=['GET'])
 def etiqueta_produto(id):

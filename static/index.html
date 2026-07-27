@@ -317,9 +317,15 @@ th, td {
             </div>
         </div>
         <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
+        <div style="margin-bottom: 8px;">
+            <button onclick="imprimirSelecionados()" style="padding:6px 14px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;">
+                🏷️ Imprimir Etiquetas Selecionadas
+            </button>
+        </div>    
             <table>
                 <thead>
                         <tr>
+                            <th style="width:36px; min-width:36px;"><input type="checkbox" id="selectAllEtiquetas" onchange="toggleSelectAll(this)" style="cursor:pointer;"></th>
                             <th style="width:80px; min-width:80px;">Cód. Interno</th>
                             <th style="width:200px; min-width:200px;">Nome</th>
                             <th style="width:80px; min-width:80px;">Rastreab.</th>
@@ -2903,6 +2909,7 @@ function renderProdutos() {
 
             tbody.innerHTML += `
                 <tr>
+                    <td style="text-align:center;"><input type="checkbox" class="sel-etiqueta" value="${p.id}" style="cursor:pointer;"></td> 
                     <td>${p.codigo_interno || '-'}</td>
                     <td><strong>${p.nome}</strong></td>
                     <td>${p.rastreabilidade || '-'}</td>
@@ -5626,6 +5633,21 @@ async function carregarAlmoxarifadosRapido() {
     } catch (err) {
         console.error('Erro ao carregar almoxarifados:', err);
     }
+}
+
+function toggleSelectAll(source) {
+    document.querySelectorAll('.sel-etiqueta').forEach(cb => cb.checked = source.checked);
+}
+
+function imprimirSelecionados() {
+    const selecionados = [...document.querySelectorAll('.sel-etiqueta:checked')].map(cb => cb.value);
+    if (selecionados.length === 0) {
+        alert('Selecione pelo menos um produto.');
+        return;
+    }
+    const token = localStorage.getItem('access_token');
+    const ids = selecionados.join(',');
+    window.open(`/produtos/etiquetas/lote?ids=${ids}&token=${token}`, '_blank');
 }
 
 </script>
