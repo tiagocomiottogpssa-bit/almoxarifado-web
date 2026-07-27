@@ -2284,29 +2284,48 @@ def etiquetas_lote():
         etiquetas_html += f'''
         <div class="etiqueta">
             <img src="/produtos/{p['id']}/codigo-barras" alt="Código de Barras">
+            <div class="codigo">{escape(codigo)}</div>
             <div class="nome">{escape(nome)}</div>
-            <div class="info">Cód: {escape(codigo)} | {escape(unidade)}</div>
+            <div class="unidade">{escape(unidade)}</div>
         </div>'''
     
     html = f'''<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8"><title>Etiquetas em Lote</title>
+    <meta charset="UTF-8">
+    <title>Etiquetas em Lote - A4 31x17mm</title>
     <style>
         * {{ margin:0; padding:0; box-sizing:border-box; }}
-        body {{ font-family:Arial,sans-serif; padding:20px; }}
-        .etiqueta-container {{ display:flex; flex-wrap:wrap; gap:16px; justify-content:center; }}
-        .etiqueta {{ width:280px; padding:16px; border:2px solid #333; border-radius:8px; text-align:center; background:#fff; page-break-inside:avoid; }}
-        .etiqueta img {{ width:220px; height:auto; margin-bottom:8px; }}
-        .etiqueta .nome {{ font-size:14px; font-weight:bold; margin-bottom:4px; }}
-        .etiqueta .info {{ font-size:12px; color:#555; }}
-        .btn-imprimir {{ display:block; margin:0 auto 20px; padding:12px 24px; font-size:16px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; }}
-        @media print {{ .btn-imprimir {{ display:none; }} .etiqueta {{ border:1px solid #000; }} }}
+        body {{ font-family:Arial, Helvetica, sans-serif; background:#ccc; }}
+        .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:8mm 8mm 0 8mm; }}
+        .grid {{ display:grid; grid-template-columns:repeat(6, 31mm); grid-template-rows:repeat(16, 17mm); gap:0; justify-content:space-between; }}
+        .etiqueta {{ width:31mm; height:17mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
+        .etiqueta img {{ max-width:26mm; max-height:7mm; margin-bottom:0.5mm; }}
+        .etiqueta .codigo {{ font-size:6px; font-weight:bold; text-align:center; line-height:1.1; }}
+        .etiqueta .nome {{ font-size:5.5px; text-align:center; line-height:1.1; color:#333; }}
+        .etiqueta .unidade {{ font-size:5px; text-align:center; line-height:1.1; color:#666; }}
+        .no-print {{ text-align:center; padding:10px 0; }}
+        .no-print button {{ padding:10px 24px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; margin:0 4px; }}
+        @media print {{
+            @page {{ size:A4; margin:0; }}
+            body {{ background:#fff; }}
+            .page {{ width:100%; min-height:auto; padding:8mm 8mm 0 8mm; box-shadow:none; }}
+            .no-print {{ display:none; }}
+            .etiqueta {{ border:0.2mm solid #000; }}
+        }}
     </style>
 </head>
 <body>
-    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Todas</button>
-    <div class="etiqueta-container">{etiquetas_html}</div>
+    <div class="no-print">
+        <button onclick="window.print()">🖨️ Imprimir ({len(produtos)} etiquetas)</button>
+        <button onclick="window.close()">✕ Fechar</button>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 6 colunas × 16 linhas · {len(produtos)} etiqueta(s)</p>
+    </div>
+    <div class="page">
+        <div class="grid">
+            {etiquetas_html}
+        </div>
+    </div>
 </body>
 </html>'''
     return html
