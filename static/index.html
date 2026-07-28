@@ -2756,36 +2756,7 @@ function abrirPedidoItensSelecionados() {
 }
 
 // ========== EXPORTAR / IMPORTAR ESTOQUE ==========
-function exportarEstoque() {
-    if (!estoqueData.length) {
-        showMessage('estoque-message', 'Nenhum dado para exportar.', 'error');
-        return;
-    }
 
-    const cabecalho = 'Código Interno;Produto;Categoria;Almoxarifado;Qtd. Atual;Est. Mínimo;Status\n';
-
-    const linhas = estoqueData.map(item => {
-        const status = obterStatusEstoque(item.quantidade, item.estoque_minimo);
-        return [
-            item.codigo_interno || '',
-            item.produto_nome || '',
-            item.categoria || '',
-            item.almoxarifado_nome || '',
-            item.quantidade || 0,
-            item.estoque_minimo || 0,
-            status
-        ].join(';');
-    }).join('\n');
-
-    const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `estoque_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-
-    showMessage('estoque-message', 'Arquivo exportado com sucesso!', 'success');
-}
 
 let arquivoImport = null;
 
