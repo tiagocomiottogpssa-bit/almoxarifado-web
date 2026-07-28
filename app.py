@@ -740,6 +740,151 @@ def excluir_almoxarifado(id):
 # COLABORADORES
 # ============================================================
 
+@app.route('/colaboradores/<int:id>/codigo-barras', methods=['GET'])
+def gerar_codigo_barras_colaborador(id):
+    try:
+        with get_connection() as conn:
+            colab = conn.execute(
+                'SELECT matricula, nome FROM colaboradores WHERE id = ?',
+                (id,)
+            ).fetchone()
+            if not colab:
+                return response(False, message='Colaborador não encontrado.', status_code=404)
+
+            codigo = colab['matricula']
+            if not codigo:
+                return response(False, message='Colaborador sem matrícula.', status_code=400)
+
+            CODE128 = barcode.get_barcode_class('code128')
+            codigo_barras = CODE128(codigo, writer=ImageWriter())
+            buf = io.BytesIO()
+            codigo_barras.write(buf)
+            buf.seek(0)
+            return send_file(buf, mimetype='image/png')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/colaboradores/<int:id>/etiqueta', methods=['GET'])
+def etiqueta_colaborador(id):
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return '<h2>Token ausente</h2>', 401
+    try:
+        decode_token(token)
+    except Exception:
+        return '<h2>Token inválido ou expirado</h2>', 401
+    try:
+        with get_connection() as conn:
+            colab = conn.execute(
+                'SELECT nome, matricula, setor, cargo FROM colaboradores WHERE id = ?',
+                (id,)
+            ).fetchone()
+            if not colab:
+                return '<h2>Colaborador não encontrado</h2>', 404
+
+            nome = colab['nome'] or 'Sem nome'
+            matricula = colab['matricula'] or '000000'
+            setor = colab['setor'] or ''
+            cargo = colab['cargo'] or ''
+
+            html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Etiqueta - {escape(nome)}</title>
+<style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family:Arial,sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:20px; }}
+    .etiqueta {{ width:280px; padding:16px; border:2px solid #333; border-radius:8px; text-align:center; background:#fff; }}
+    .etiqueta img {{ width:220px; height:auto; margin-bottom:8px; }}
+    .etiqueta .nome {{ font-size:14px; font-weight:bold; margin-bottom:4px; }}
+    .etiqueta .info {{ font-size:11px; color:#555; }}
+    .etiqueta .cargo {{ font-size:11px; color:#2563eb; margin-top:2px; }}
+    .btn-imprimir {{ margin-top:20px; padding:12px 24px; font-size:16px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; }}
+    @media print {{ .btn-imprimir {{ display:none; }} .etiqueta {{ border:1px solid #000; }} }}
+</style></head>
+<body>
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Etiqueta</button>
+    <div class="etiqueta">
+        <img src="/colaboradores/{id}/codigo-barras" alt="Matrícula">
+        <div class="nome">{escape(nome)}</div>
+        <div class="info">Mat: {escape(matricula)}</div>
+        <div class="info">{escape(setor)}</div>
+        <div class="cargo">{escape(cargo)}</div>
+    </div>
+</body></html>'''
+            return html
+    except Exception as e:
+        return f'<h2>Erro: {str(e)}</h2>', 500
+
+@app.route('/colaboradores/etiquetas/lote', methods=['GET'])
+def etiquetas_colaboradores_lote():
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return '<h2>Token ausente</h2>', 401
+    try:
+        decode_token(token)
+    except Exception:
+        return '<h2>Token inválido ou expirado</h2>', 401
+
+    ids = request.args.get('ids', '')
+    if not ids:
+        return '<h2>Nenhum colaborador selecionado</h2>', 400
+
+    lista_ids = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+    if not lista_ids:
+        return '<h2>IDs inválidos</h2>', 400
+
+    placeholders = ','.join(['?'] * len(lista_ids))
+    with get_connection() as conn:
+        colaboradores = conn.execute(
+            f'SELECT id, nome, matricula, setor, cargo FROM colaboradores WHERE id IN ({placeholders})',
+            lista_ids
+        ).fetchall()
+
+    if not colaboradores:
+        return '<h2>Nenhum colaborador encontrado</h2>', 404
+
+    etiquetas_html = ''
+    for c in colaboradores:
+        nome = c['nome'] or 'Sem nome'
+        matricula = c['matricula'] or '000000'
+        setor = c['setor'] or ''
+        cargo = c['cargo'] or ''
+        etiquetas_html += f'''
+        <div class="etiqueta">
+            <img src="/colaboradores/{c['id']}/codigo-barras" alt="Matrícula">
+            <div class="nome">{escape(nome)}</div>
+            <div class="info">Mat: {escape(matricula)}</div>
+            <div class="info">{escape(setor)}</div>
+            <div class="cargo">{escape(cargo)}</div>
+        </div>'''
+
+    html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Etiquetas Colaboradores - Lote</title>
+<style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family:Arial,Helvetica,sans-serif; background:#ccc; }}
+    .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:8mm 8mm 0 8mm; }}
+    .grid {{ display:grid; grid-template-columns:repeat(6, 31mm); grid-template-rows:repeat(16, 17mm); gap:0; justify-content:space-between; }}
+    .etiqueta {{ width:31mm; height:17mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
+    .etiqueta img {{ max-width:26mm; max-height:7mm; margin-bottom:0.5mm; }}
+    .etiqueta .nome {{ font-size:5.5px; font-weight:bold; text-align:center; line-height:1.1; }}
+    .etiqueta .info {{ font-size:5px; text-align:center; line-height:1.1; color:#333; }}
+    .etiqueta .cargo {{ font-size:4.5px; text-align:center; line-height:1.1; color:#2563eb; }}
+    .no-print {{ text-align:center; padding:10px 0; }}
+    .no-print button {{ padding:10px 24px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; margin:0 4px; }}
+    @media print {{ @page {{ size:A4; margin:0; }} body {{ background:#fff; }} .page {{ width:100%; padding:8mm 8mm 0 8mm; }} .no-print {{ display:none; }} .etiqueta {{ border:0.2mm solid #000; }} }}
+</style></head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">🖨️ Imprimir ({len(colaboradores)} etiquetas)</button>
+        <button onclick="window.close()">✕ Fechar</button>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 6 colunas × 16 linhas · {len(colaboradores)} etiqueta(s)</p>
+    </div>
+    <div class="page"><div class="grid">{etiquetas_html}</div></div>
+</body></html>'''
+    return html
+
 @app.route('/colaboradores', methods=['GET'])
 @jwt_required()
 def listar_colaboradores():
@@ -1000,6 +1145,154 @@ def importar_colaboradores():
 # ============================================================
 # UNIDADES
 # ============================================================
+
+@app.route('/unidades/<int:id>/codigo-barras', methods=['GET'])
+def gerar_codigo_barras_unidade(id):
+    try:
+        with get_connection() as conn:
+            unid = conn.execute(
+                'SELECT tag, numero_serie FROM unidades WHERE id = ?',
+                (id,)
+            ).fetchone()
+            if not unid:
+                return response(False, message='Unidade não encontrada.', status_code=404)
+
+            codigo = unid['tag'] or unid['numero_serie'] or 'SEMCODIGO'
+            CODE128 = barcode.get_barcode_class('code128')
+            codigo_barras = CODE128(codigo, writer=ImageWriter())
+            buf = io.BytesIO()
+            codigo_barras.write(buf)
+            buf.seek(0)
+            return send_file(buf, mimetype='image/png')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/unidades/<int:id>/etiqueta', methods=['GET'])
+def etiqueta_unidade(id):
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return '<h2>Token ausente</h2>', 401
+    try:
+        decode_token(token)
+    except Exception:
+        return '<h2>Token inválido ou expirado</h2>', 401
+    try:
+        with get_connection() as conn:
+            unid = conn.execute('''
+                SELECT u.tag, u.numero_serie, u.status, p.nome as produto_nome
+                FROM unidades u
+                LEFT JOIN produtos p ON u.produto_id = p.id
+                WHERE u.id = ?
+            ''', (id,)).fetchone()
+            if not unid:
+                return '<h2>Unidade não encontrada</h2>', 404
+
+            tag = unid['tag'] or 'SEMTAG'
+            serie = unid['numero_serie'] or ''
+            produto = unid['produto_nome'] or 'Sem produto'
+            status = unid['status'] or ''
+
+            html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Etiqueta - {escape(tag)}</title>
+<style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family:Arial,sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:20px; }}
+    .etiqueta {{ width:280px; padding:16px; border:2px solid #333; border-radius:8px; text-align:center; background:#fff; }}
+    .etiqueta img {{ width:220px; height:auto; margin-bottom:8px; }}
+    .etiqueta .tag {{ font-size:16px; font-weight:bold; margin-bottom:2px; }}
+    .etiqueta .produto {{ font-size:13px; margin-bottom:2px; }}
+    .etiqueta .info {{ font-size:11px; color:#555; }}
+    .etiqueta .status {{ font-size:11px; font-weight:bold; margin-top:2px; color:#2563eb; }}
+    .btn-imprimir {{ margin-top:20px; padding:12px 24px; font-size:16px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; }}
+    @media print {{ .btn-imprimir {{ display:none; }} .etiqueta {{ border:1px solid #000; }} }}
+</style></head>
+<body>
+    <button class="btn-imprimir" onclick="window.print()">🖨️ Imprimir Etiqueta</button>
+    <div class="etiqueta">
+        <img src="/unidades/{id}/codigo-barras" alt="Código">
+        <div class="tag">{escape(tag)}</div>
+        <div class="produto">{escape(produto)}</div>
+        <div class="info">Série: {escape(serie)}</div>
+        <div class="status">{escape(status)}</div>
+    </div>
+</body></html>'''
+            return html
+    except Exception as e:
+        return f'<h2>Erro: {str(e)}</h2>', 500
+
+@app.route('/unidades/etiquetas/lote', methods=['GET'])
+def etiquetas_unidades_lote():
+    token = request.args.get('token') or request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return '<h2>Token ausente</h2>', 401
+    try:
+        decode_token(token)
+    except Exception:
+        return '<h2>Token inválido ou expirado</h2>', 401
+
+    ids = request.args.get('ids', '')
+    if not ids:
+        return '<h2>Nenhuma unidade selecionada</h2>', 400
+
+    lista_ids = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+    if not lista_ids:
+        return '<h2>IDs inválidos</h2>', 400
+
+    placeholders = ','.join(['?'] * len(lista_ids))
+    with get_connection() as conn:
+        unidades = conn.execute(f'''
+            SELECT u.id, u.tag, u.numero_serie, u.status, p.nome as produto_nome
+            FROM unidades u
+            LEFT JOIN produtos p ON u.produto_id = p.id
+            WHERE u.id IN ({placeholders})
+        ''', lista_ids).fetchall()
+
+    if not unidades:
+        return '<h2>Nenhuma unidade encontrada</h2>', 404
+
+    etiquetas_html = ''
+    for u in unidades:
+        tag = u['tag'] or 'SEMTAG'
+        serie = u['numero_serie'] or ''
+        produto = u['produto_nome'] or 'Sem produto'
+        status = u['status'] or ''
+        etiquetas_html += f'''
+        <div class="etiqueta">
+            <img src="/unidades/{u['id']}/codigo-barras" alt="Código">
+            <div class="tag">{escape(tag)}</div>
+            <div class="produto">{escape(produto)}</div>
+            <div class="info">Série: {escape(serie)}</div>
+            <div class="status">{escape(status)}</div>
+        </div>'''
+
+    html = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>Etiquetas Unidades - Lote</title>
+<style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family:Arial,Helvetica,sans-serif; background:#ccc; }}
+    .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:8mm 8mm 0 8mm; }}
+    .grid {{ display:grid; grid-template-columns:repeat(6, 31mm); grid-template-rows:repeat(16, 17mm); gap:0; justify-content:space-between; }}
+    .etiqueta {{ width:31mm; height:17mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0.8mm; overflow:hidden; }}
+    .etiqueta img {{ max-width:26mm; max-height:6mm; margin-bottom:0.3mm; }}
+    .etiqueta .tag {{ font-size:6px; font-weight:bold; text-align:center; line-height:1.1; }}
+    .etiqueta .produto {{ font-size:5px; text-align:center; line-height:1.1; color:#333; }}
+    .etiqueta .info {{ font-size:4.5px; text-align:center; line-height:1.1; color:#555; }}
+    .etiqueta .status {{ font-size:4.5px; text-align:center; line-height:1.1; color:#2563eb; font-weight:bold; }}
+    .no-print {{ text-align:center; padding:10px 0; }}
+    .no-print button {{ padding:10px 24px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; margin:0 4px; }}
+    @media print {{ @page {{ size:A4; margin:0; }} body {{ background:#fff; }} .page {{ width:100%; padding:8mm 8mm 0 8mm; }} .no-print {{ display:none; }} .etiqueta {{ border:0.2mm solid #000; }} }}
+</style></head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">🖨️ Imprimir ({len(unidades)} etiquetas)</button>
+        <button onclick="window.close()">✕ Fechar</button>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 6 colunas × 16 linhas · {len(unidades)} etiqueta(s)</p>
+    </div>
+    <div class="page"><div class="grid">{etiquetas_html}</div></div>
+</body></html>'''
+    return html
 
 @app.route('/unidades', methods=['GET'])
 @jwt_required()

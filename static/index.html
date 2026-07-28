@@ -640,10 +640,14 @@ th, td {
                     <h3 style="margin: 0; color: #374151; font-size: 16px;">Unidades Cadastradas</h3>
                     <span style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
                 </div>
+                <button onclick="imprimirUnidadesSelecionadas()" style="padding:6px 14px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;">
+                    🏷️ Imprimir Etiquetas Selecionadas
+                </button>
                 <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
+                                <th style="width:36px; min-width:36px;"><input type="checkbox" id="selectAllUnidades" onchange="toggleSelectAllUnidades(this)" style="cursor:pointer;"></th>
                                 <th style="width:120px; min-width:120px;">Produto</th>
                                 <th style="width:80px; min-width:80px;">TAG</th>
                                 <th style="width:110px; min-width:110px;">Nº Série</th>
@@ -654,7 +658,7 @@ th, td {
                         </thead>
                         <tbody id="tabela-unidades-body">
                             <tr>
-                                <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">
+                                <td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">
                                     Nenhuma unidade cadastrada.
                                 </td>
                             </tr>
@@ -821,10 +825,14 @@ th, td {
                 <h3 style="margin: 0; color: #374151; font-size: 16px;">Colaboradores Cadastrados</h3>
                 <span id="contador-colaboradores" style="font-size: 13px; color: #6b7280; background: #f3f4f6; padding: 4px 12px; border-radius: 12px;">0 registros</span>
             </div>
+            <button onclick="imprimirColaboradoresSelecionados()" style="padding:6px 14px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;">
+                🏷️ Imprimir Etiquetas Selecionadas
+            </button>
             <div style="overflow-x: auto; max-height: 500px; overflow-y: auto;">
                 <table>
                     <thead>
                         <tr>
+                            <th style="width:36px; min-width:36px;"><input type="checkbox" id="selectAllColaboradores" onchange="toggleSelectAllColaboradores(this)" style="cursor:pointer;"></th>
                             <th style="width:140px; min-width:140px;">Nome</th>
                             <th style="width:80px; min-width:80px;">Matrícula</th>
                             <th style="width:110px; min-width:110px;">Telefone</th>
@@ -836,7 +844,7 @@ th, td {
                     </thead>
                     <tbody id="tabela-colaboradores">
                         <tr>
-                            <td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">
+                            <td colspan="8" style="text-align: center; color: #9ca3af; padding: 24px;">
                                 Nenhum colaborador cadastrado.
                             </td>
                         </tr>
@@ -3750,6 +3758,7 @@ function loadUnidades() {
         
         tbody.innerHTML = data.data.map(u => `
             <tr>
+                <td style="text-align:center;"><input type="checkbox" class="sel-etiqueta-unidade" value="${u.id}" style="cursor:pointer;"></td>
                 <td>${u.produto_nome || '-'}</td>
                 <td><strong>${u.tag || '-'}</strong></td>
                 <td>${u.numero_serie || '-'}</td>
@@ -4191,6 +4200,7 @@ function loadColaboradores() {
         
         tbody.innerHTML = data.data.map(c => `
             <tr>
+                <td style="text-align:center;"><input type="checkbox" class="sel-etiqueta-colaborador" value="${c.id}" style="cursor:pointer;"></td>
                 <td><strong>${c.nome}</strong></td>
                 <td>${c.matricula ? c.matricula : (c.matricula === undefined ? '-' : c.matricula)}</td>
                 <td>${c.telefone || '-'}</td>
@@ -5648,6 +5658,32 @@ function imprimirSelecionados() {
     const token = localStorage.getItem('access_token');
     const ids = selecionados.join(',');
     window.open(`/produtos/etiquetas/lote?ids=${ids}&token=${token}`, '_blank');
+}
+
+// ===== COLABORADORES - Etiquetas em Lote =====
+function toggleSelectAllColaboradores(source) {
+    document.querySelectorAll('.sel-etiqueta-colaborador').forEach(cb => cb.checked = source.checked);
+}
+
+function imprimirColaboradoresSelecionados() {
+    const selecionados = [...document.querySelectorAll('.sel-etiqueta-colaborador:checked')].map(cb => cb.value);
+    if (selecionados.length === 0) { alert('Selecione pelo menos um colaborador.'); return; }
+    const token = localStorage.getItem('access_token');
+    const ids = selecionados.join(',');
+    window.open(`/colaboradores/etiquetas/lote?ids=${ids}&token=${token}`, '_blank');
+}
+
+// ===== UNIDADES - Etiquetas em Lote =====
+function toggleSelectAllUnidades(source) {
+    document.querySelectorAll('.sel-etiqueta-unidade').forEach(cb => cb.checked = source.checked);
+}
+
+function imprimirUnidadesSelecionadas() {
+    const selecionados = [...document.querySelectorAll('.sel-etiqueta-unidade:checked')].map(cb => cb.value);
+    if (selecionados.length === 0) { alert('Selecione pelo menos uma unidade.'); return; }
+    const token = localStorage.getItem('access_token');
+    const ids = selecionados.join(',');
+    window.open(`/unidades/etiquetas/lote?ids=${ids}&token=${token}`, '_blank');
 }
 
 </script>
