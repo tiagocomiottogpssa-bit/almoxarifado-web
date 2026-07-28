@@ -156,32 +156,6 @@ th, td {
 </style>
 </head>
 
-<!-- Modal Importar Estoque -->
-<div id="modal-importar-estoque" class="modal-overlay hidden">
-    <div class="modal">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-            <h3 style="margin:0;">📥 Importar Estoque</h3>
-            <button onclick="fecharModal('modal-importar-estoque')" style="background:none;border:none;font-size:24px;cursor:pointer;">&times;</button>
-        </div>
-        <p style="color:#6b7280;margin-bottom:16px;font-size:14px;">
-            Faça upload de um arquivo Excel (.xlsx) ou CSV com as colunas:
-            <strong>codigo_interno</strong> e <strong>quantidade</strong>.
-            Opcional: <strong>almoxarifado</strong> (nome do almoxarifado).
-        </p>
-        <div style="border:2px dashed #d1d5db;border-radius:10px;padding:32px;text-align:center;margin-bottom:16px;"
-             ondragover="event.preventDefault()" ondrop="handleDropImport(event)">
-            <div style="font-size:48px;margin-bottom:8px;">📂</div>
-            <p style="color:#6b7280;margin:0 0 8px;">Arraste o arquivo aqui ou clique para selecionar</p>
-            <input type="file" id="import-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleFileImport(event)">
-            <button type="button" class="btn-secondary" onclick="document.getElementById('import-file').click()">Selecionar Arquivo</button>
-        </div>
-        <div id="import-status" style="display:none;padding:12px;border-radius:8px;margin-bottom:12px;font-size:14px;"></div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button type="button" class="btn-secondary" onclick="fecharModal('modal-importar-estoque')">Cancelar</button>
-            <button type="button" class="btn-primary" id="btn-importar" onclick="enviarImportacao()" disabled>Importar</button>
-        </div>
-    </div>
-</div>
 
 <body>
 
@@ -653,12 +627,13 @@ th, td {
                                 <th style="width:110px; min-width:110px;">Nº Série</th>
                                 <th style="width:80px; min-width:80px;">Status</th>
                                 <th style="width:120px; min-width:120px;">Localização</th>
+                                <th style="width:120px; min-width:120px;">Almoxarifado</th>
                                 <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-unidades-body">
                             <tr>
-                                <td colspan="7" style="text-align: center; color: #9ca3af; padding: 24px;">
+                                <td colspan="8" style="text-align: center; color: #9ca3af; padding: 24px;">
                                     Nenhuma unidade cadastrada.
                                 </td>
                             </tr>
@@ -1269,7 +1244,10 @@ th, td {
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h3 style="margin: 0; color: #374151; font-size: 16px;">Inventário de Produtos</h3>
                 <div style="display: flex; gap: 8px;">
-                    <button type="button" class="btn-secondary" style="font-size:13px;" onclick="abrirModalImportar()">📥 Importar</button>
+                    <label class="btn-import" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#6366f1;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:500;">
+                        📥 Importar
+                        <input type="file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importarEstoque(this)">
+                    </label>
                     <button type="button" class="btn-secondary" style="font-size: 13px;" onclick="exportarEstoque()">📥 Exportar</button>
                     <button type="button" class="btn-secondary" style="font-size: 13px;" onclick="carregarEstoque()">🔄 Atualizar</button>
                 </div>
@@ -2602,6 +2580,37 @@ async function editarEstoqueMinimo(index) {
     }
 }
 
+function importarEstoque(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (!confirm(`Deseja importar o arquivo "${file.name}"?\n\nO sistema atualizará os estoques dos produtos com base no código interno.`)) {
+        input.value = '';
+        return;
+    }
+
+    const token = localStorage.getItem('access_token');
+    const formData = new FormData();
+    formData.append('file', file);
+
+    fetch(`${API_BASE}/estoque/importar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message || 'Importação concluída!');
+            carregarEstoque();
+        } else {
+            alert('Erro: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(err => alert('Erro ao importar: ' + err.message))
+    .finally(() => { input.value = ''; });
+}
+
 // Carregar select de almoxarifados nos filtros
 async function carregarSelectAlmoxarifadoEstoque() {
     const select = document.getElementById('estoque_filtro_almoxarifado');
@@ -2678,45 +2687,21 @@ function limparFiltrosEstoque() {
 
 function exportarEstoque() {
     const token = localStorage.getItem('access_token');
-    
-    fetch(`${API_BASE}/estoque`, {
+
+    fetch(`${API_BASE}/estoque/exportar`, {
         headers: { 'Authorization': `Bearer ${token}` }
     })
-    .then(res => res.json())
-    .then(data => {
-        if (!data.success || !data.data || !data.data.length) {
-            alert('Nenhum dado para exportar.');
-            return;
-        }
-
-        const cabecalho = 'Código Interno;Produto;Categoria;Almoxarifado;Qtd. Atual;Est. Mínimo;Status;Custo Médio;Valor Patrim.\n';
-        const linhas = data.data.map(item => {
-            const qtd = item.quantidade || 0;
-            const min = item.estoque_minimo || item.produto_estoque_minimo || 0;
-            let status;
-            if (qtd === 0) status = 'Sem Estoque';
-            else if (qtd <= min * 0.5) status = 'Crítico';
-            else if (qtd <= min) status = 'Baixo';
-            else status = 'Normal';
-            return [
-                item.codigo_interno || '',
-                item.produto_nome || '',
-                item.categoria || '',
-                item.almoxarifado_nome || '',
-                qtd,
-                min,
-                status,
-                (item.custo_medio || 0).toFixed(2),
-                (item.valor_patrimonial || 0).toFixed(2)
-            ].join(';');
-        }).join('\n');
-
-        const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `estoque_${new Date().toISOString().slice(0, 10)}.csv`;
-        link.click();
-        URL.revokeObjectURL(link.href);
+    .then(res => {
+        if (!res.ok) throw new Error('Erro ao exportar');
+        return res.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `estoque_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     })
     .catch(err => alert('Erro ao exportar: ' + err.message));
 }
@@ -3806,6 +3791,7 @@ function loadUnidades() {
                 <td>${u.numero_serie || '-'}</td>
                 <td>${renderStatusUnidade(u.status)}</td>
                 <td>${u.localizacao || '-'}</td>
+                <td>${u.almoxarifado_nome || '-'}</td>
                 <td style="text-align: center;">
                     <button class="btn-sm btn-primary" onclick="editarUnidade(${u.id})">✏️</button>
                     <button class="btn-sm btn-danger" onclick="excluirUnidade(${u.id})">🗑️</button>
