@@ -1704,22 +1704,27 @@ def retornar_manutencao_lote():
 def exportar_unidades():
     try:
         with get_connection() as conn:
-            rows = conn.execute(
-                'SELECT nome, sigla, responsavel, telefone, email FROM unidades ORDER BY nome'
-            ).fetchall()
+            rows = conn.execute('''
+                SELECT u.tag, u.numero_serie, p.nome AS produto_nome, u.status,
+                       u.localizacao, a.nome AS almoxarifado_nome
+                FROM unidades u
+                LEFT JOIN produtos p ON u.produto_id = p.id
+                LEFT JOIN almoxarifados a ON u.almoxarifado_id = a.id
+                ORDER BY u.tag
+            ''').fetchall()
 
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Unidades"
-
-        cabecalhos = ['Nome', 'Sigla', 'Responsável', 'Telefone', 'E-mail']
+        cabecalhos = ['TAG', 'Nº Série', 'Produto', 'Status', 'Localização', 'Almoxarifado']
         ws.append(cabecalhos)
         for cell in ws[1]:
             cell.font = openpyxl.styles.Font(bold=True)
-
         for row in rows:
-            ws.append([row['nome'], row['sigla'], row['responsavel'], row['telefone'], row['email']])
-
+            ws.append([
+                row['tag'], row['numero_serie'], row['produto_nome'],
+                row['status'], row['localizacao'], row['almoxarifado_nome']
+            ])
         for col in ws.columns:
             max_len = max((len(str(c.value or '')) for c in col), default=0)
             ws.column_dimensions[col[0].column_letter].width = max_len + 4
@@ -1727,7 +1732,6 @@ def exportar_unidades():
         output = BytesIO()
         wb.save(output)
         output.seek(0)
-
         return send_file(
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1826,7 +1830,6 @@ def transferir_unidades_lote():
 def importar_unidades():
     if 'file' not in request.files:
         return response(False, message='Nenhum arquivo enviado.', status_code=400)
-
     file = request.files['file']
     if file.filename == '':
         return response(False, message='Arquivo sem nome.', status_code=400)
@@ -1834,43 +1837,68 @@ def importar_unidades():
     try:
         wb = openpyxl.load_workbook(file)
         ws = wb.active
-
         importados = 0
         erros = []
 
         with get_connection() as conn:
             for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
-                nome = str(row[0]).strip() if row[0] else ''
-                sigla = str(row[1]).strip() if row[1] else ''
-                responsavel = str(row[2]).strip() if row[2] else ''
-                telefone = str(row[3]).strip() if row[3] else ''
-                email = str(row[4]).strip() if row[4] else ''
+                tag = str(row[0]).strip() if row[0] else ''
+                numero_serie = str(row[1]).strip() if row[1] else ''
+                produto_nome = str(row[2]).strip() if row[2] else ''
+                status = str(row[3]).strip() if row[3] else 'disponivel'
+                localizacao = str(row[4]).strip() if row[4] else ''
+                almoxarifado_nome = str(row[5]).strip() if row[5] else ''
 
-                if not nome:
+                if not tag:
+                    erros.append(f'Linha {i}: TAG é obrigatória')
                     continue
 
-                # Verifica se já existe pela sigla
-                if sigla:
-                    existente = conn.execute(
-                        'SELECT id FROM unidades WHERE sigla = ?', (sigla,)
-                    ).fetchone()
-                    if existente:
-                        conn.execute("""
-                            UPDATE unidades SET nome=?, responsavel=?, telefone=?, email=?, updated_at=?
-                            WHERE id=?
-                        """, (nome, responsavel, telefone, email, now_iso(), existente['id']))
-                        importados += 1
-                        continue
+                # Busca o produto pelo nome
+                produto = conn.execute(
+                    'SELECT id FROM produtos WHERE nome = ?', (produto_nome,)
+                ).fetchone()
+                if not produto:
+                    erros.append(f'Linha {i}: produto "{produto_nome}" não encontrado')
+                    continue
 
-                conn.execute("""
-                    INSERT INTO unidades (nome, sigla, responsavel, telefone, email, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (nome, sigla, responsavel, telefone, email, now_iso(), now_iso()))
+                # Busca o almoxarifado pelo nome
+                almoxarifado_id = None
+                if almoxarifado_nome:
+                    almox = conn.execute(
+                        'SELECT id FROM almoxarifados WHERE nome = ?', (almoxarifado_nome,)
+                    ).fetchone()
+                    if almox:
+                        almoxarifado_id = almox['id']
+
+                # Verifica se já existe pela TAG
+                existente = conn.execute(
+                    'SELECT id FROM unidades WHERE tag = ?', (tag,)
+                ).fetchone()
+
+                if existente:
+                    conn.execute("""
+                        UPDATE unidades SET numero_serie=?, produto_id=?, status=?,
+                            localizacao=?, almoxarifado_id=?, updated_at=?
+                        WHERE id=?
+                    """, (numero_serie, produto['id'], status, localizacao,
+                          almoxarifado_id, now_iso(), existente['id']))
+                else:
+                    conn.execute("""
+                        INSERT INTO unidades (produto_id, tag, numero_serie, status,
+                            localizacao, almoxarifado_id, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (produto['id'], tag, numero_serie, status, localizacao,
+                          almoxarifado_id, now_iso(), now_iso()))
                 importados += 1
 
             conn.commit()
 
-        return response(True, message=f'Importação concluída! {importados} unidades processadas.')
+        msg = f'{importados} unidade(s) processada(s).'
+        if erros:
+            msg += f' {len(erros)} erro(s): ' + '; '.join(erros[:5])
+            if len(erros) > 5:
+                msg += f' (e mais {len(erros)-5})'
+        return response(True, message=msg)
     except Exception as e:
         return response(False, message=f'Erro ao importar: {str(e)}', status_code=500)
 
@@ -1962,6 +1990,53 @@ def enviar_unidades_manutencao_lote():
 # ============================================================
 # ESTOQUE
 # ============================================================
+
+@app.route('/estoque/exportar', methods=['GET'])
+@jwt_required()
+def exportar_estoque():
+    try:
+        with get_connection() as conn:
+            rows = conn.execute('''
+                SELECT p.codigo_interno, p.nome AS produto_nome, p.categoria,
+                       a.nome AS almoxarifado_nome, e.quantidade,
+                       COALESCE(e.estoque_minimo, p.estoque_minimo, 0) AS estoque_minimo,
+                       p.custo_medio,
+                       e.quantidade * COALESCE(p.custo_medio, 0) AS valor_patrimonial
+                FROM estoque e
+                LEFT JOIN produtos p ON e.produto_id = p.id
+                LEFT JOIN almoxarifados a ON e.almoxarifado_id = a.id
+                ORDER BY p.nome ASC
+            ''').fetchall()
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Estoque"
+        cabecalhos = ['Código Interno', 'Produto', 'Categoria', 'Almoxarifado',
+                      'Qtd. Atual', 'Est. Mínimo', 'Custo Médio', 'Valor Patrimonial']
+        ws.append(cabecalhos)
+        for cell in ws[1]:
+            cell.font = openpyxl.styles.Font(bold=True)
+        for row in rows:
+            ws.append([
+                row['codigo_interno'], row['produto_nome'], row['categoria'],
+                row['almoxarifado_nome'], row['quantidade'], row['estoque_minimo'],
+                row['custo_medio'], row['valor_patrimonial']
+            ])
+        for col in ws.columns:
+            max_len = max((len(str(c.value or '')) for c in col), default=0)
+            ws.column_dimensions[col[0].column_letter].width = max_len + 4
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='estoque.xlsx'
+        )
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
 
 @app.route('/estoque', methods=['GET'])
 @jwt_required()

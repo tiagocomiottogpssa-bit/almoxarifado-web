@@ -2677,7 +2677,48 @@ function limparFiltrosEstoque() {
 }
 
 function exportarEstoque() {
-    alert('Exportação será implementada em breve.');
+    const token = localStorage.getItem('access_token');
+    
+    fetch(`${API_BASE}/estoque`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (!data.success || !data.data || !data.data.length) {
+            alert('Nenhum dado para exportar.');
+            return;
+        }
+
+        const cabecalho = 'Código Interno;Produto;Categoria;Almoxarifado;Qtd. Atual;Est. Mínimo;Status;Custo Médio;Valor Patrim.\n';
+        const linhas = data.data.map(item => {
+            const qtd = item.quantidade || 0;
+            const min = item.estoque_minimo || item.produto_estoque_minimo || 0;
+            let status;
+            if (qtd === 0) status = 'Sem Estoque';
+            else if (qtd <= min * 0.5) status = 'Crítico';
+            else if (qtd <= min) status = 'Baixo';
+            else status = 'Normal';
+            return [
+                item.codigo_interno || '',
+                item.produto_nome || '',
+                item.categoria || '',
+                item.almoxarifado_nome || '',
+                qtd,
+                min,
+                status,
+                (item.custo_medio || 0).toFixed(2),
+                (item.valor_patrimonial || 0).toFixed(2)
+            ].join(';');
+        }).join('\n');
+
+        const blob = new Blob(['\ufeff' + cabecalho + linhas], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `estoque_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    })
+    .catch(err => alert('Erro ao exportar: ' + err.message));
 }
 
 function atualizarBtnPedidoEstoque() {
@@ -2815,22 +2856,23 @@ async function enviarImportacao() {
 
     const formData = new FormData();
     formData.append('file', arquivoImport);
+    const token = localStorage.getItem('access_token');
 
     try {
         const res = await fetch(`${API_BASE}/estoque/importar`, {
             method: 'POST',
-            headers: authHeaders(),
+            headers: { 'Authorization': `Bearer ${token}` },
             body: formData
         });
         const data = await res.json();
         if (data.success) {
-            mostrarStatusImport(data.msg || 'Importação concluída!', 'success');
+            mostrarStatusImport(data.message || 'Importação concluída!', 'success');
             setTimeout(() => {
                 fecharModal('modal-importar-estoque');
                 carregarEstoque();
             }, 2000);
         } else {
-            mostrarStatusImport(data.msg || 'Erro ao importar', 'error');
+            mostrarStatusImport(data.message || 'Erro ao importar', 'error');
             btn.disabled = false;
             btn.textContent = 'Importar';
         }
