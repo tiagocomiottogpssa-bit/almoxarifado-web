@@ -5507,11 +5507,17 @@ function removerItemRapido(idx) {
 async function finalizarRetirada() {
     if (itensRapido.length === 0) { showRapidMessage('Nenhum item para retirar.', 'error'); return; }
     if (!colaboradorRapido) { showRapidMessage('Colaborador não identificado.', 'error'); return; }
-
+    
+    const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
+    if (!almoxarifadoId) {
+        showRapidMessage('Selecione o almoxarifado de origem.', 'error');
+        return;
+    }
+    
     const btn = document.getElementById('btn-finalizar-retirada');
     btn.disabled = true;
     btn.textContent = '⏳ Registrando...';
-
+    
     try {
         const res = await fetch(`${API_BASE}/movimentacoes/retirada-rapida`, {
             method: 'POST',
@@ -5528,18 +5534,11 @@ async function finalizarRetirada() {
                 }))
             })
         });
-        const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
-        if (!almoxarifadoId) {
-            showRapidMessage('Selecione o almoxarifado de origem.', 'error');
-            btn.disabled = false;
-            btn.textContent = '✅ Finalizar Retirada';
-            return;
-        }
+        
         const data = await res.json();
         if (data.success) {
             showRapidMessage(`✅ ${data.message}`, 'success');
             btn.textContent = '✅ Finalizado!';
-            // Mostra resumo
             let resumo = data.data.itens.map(i =>
                 `${i.quantidade}x ${i.produto_nome} (${i.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível'})`
             ).join('\n');
@@ -5559,7 +5558,13 @@ async function finalizarRetirada() {
 
 async function devolverItem(produtoId) {
     if (!colaboradorRapido) { showRapidMessage('Identifique o colaborador primeiro.', 'error'); return; }
-
+    
+    const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
+    if (!almoxarifadoId) {
+        showRapidMessage('Selecione o almoxarifado para devolução.', 'error');
+        return;
+    }
+    
     try {
         const res = await fetch(`${API_BASE}/movimentacoes/devolucao-rapida`, {
             method: 'POST',
@@ -5574,11 +5579,7 @@ async function devolverItem(produtoId) {
                 almoxarifado_id: parseInt(almoxarifadoId)
             })
         });
-        const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
-        if (!almoxarifadoId) {
-            showRapidMessage('Selecione o almoxarifado para devolução.', 'error');
-            return;
-        }
+        
         const data = await res.json();
         if (data.success) {
             showRapidMessage(`✅ Devolução registrada com sucesso!`, 'success');
