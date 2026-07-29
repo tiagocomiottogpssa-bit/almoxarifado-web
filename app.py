@@ -1999,7 +1999,7 @@ def buscar_unidade_por_tag():
             row = conn.execute("""
                 SELECT u.id, u.tag, u.status, u.numero_serie, u.almoxarifado_id,
                        p.id as produto_id, p.nome as produto_nome, p.codigo_interno,
-                       p.custo_medio, e.nome as equipamento_nome
+                       p.custo_medio
                 FROM unidades u
                 LEFT JOIN produtos p ON u.produto_id = p.id
                 WHERE u.tag = ? AND u.status = 'disponivel'
