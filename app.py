@@ -2047,7 +2047,7 @@ def emprestimo_rapido():
                 # Cria o empréstimo
                 cursor = conn.execute("""
                     INSERT INTO emprestimos (unidade_id, colaborador_id, data_emprestimo, status, tipo)
-                    VALUES (?, ?, datetime('now', '-3 hours'), 'ativo', 'emprestimo')
+                    VALUES (?, ?, NOW() - INTERVAL '3 hours', 'ativo', 'emprestimo')
                 """, (unidade_id, colaborador_id))
                 
                 # Atualiza status da unidade
@@ -2059,7 +2059,7 @@ def emprestimo_rapido():
                 # Registra na movimentações
                 conn.execute("""
                     INSERT INTO movimentacoes (tipo, produto_id, unidade_id, colaborador_id, almoxarifado_id, quantidade, observacao, created_at)
-                    VALUES ('saida', ?, ?, ?, ?, 1, 'Empréstimo rápido via movimentação rápida', datetime('now', '-3 hours'))
+                    VALUES ('saida', ?, ?, ?, ?, 1, 'Empréstimo rápido via movimentação rápida', NOW() - INTERVAL '3 hours')
                 """, (produto_id, unidade_id, colaborador_id, almoxarifado_id))
                 
                 resultados.append({
