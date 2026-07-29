@@ -2775,14 +2775,14 @@ def buscar_colaborador_por_codigo():
         with get_connection() as conn:
             # Primeiro tenta por código de barras
             row = conn.execute(
-                'SELECT id, nome, matricula, setor FROM colaboradores WHERE codigo_barras = ? AND ativo = 1',
+                "SELECT id, nome, matricula, setor FROM colaboradores WHERE codigo_barras = ? AND status = 'ativo'",
                 (codigo,)
             ).fetchone()
             
             # Se não achou, tenta por matrícula
             if not row:
                 row = conn.execute(
-                    'SELECT id, nome, matricula, setor FROM colaboradores WHERE matricula = ? AND ativo = 1',
+                    "SELECT id, nome, matricula, setor FROM colaboradores WHERE matricula = ? AND status = 'ativo'",
                     (codigo,)
                 ).fetchone()
 
