@@ -921,6 +921,7 @@ def criar_colaborador():
     valores = {
         'nome': nome,
         'matricula': matricula,
+        'codigo_barras': matricula,
         'email': data.get('email'),
         'setor': data.get('setor'),
         'telefone': data.get('telefone'),
