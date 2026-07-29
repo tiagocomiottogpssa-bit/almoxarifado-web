@@ -1997,11 +1997,8 @@ def exportar_estoque():
     try:
         with get_connection() as conn:
             rows = conn.execute('''
-                SELECT p.codigo_interno, p.nome AS produto_nome, p.categoria,
-                       a.nome AS almoxarifado_nome, e.quantidade,
-                       COALESCE(e.estoque_minimo, p.estoque_minimo, 0) AS estoque_minimo,
-                       p.custo_medio,
-                       e.quantidade * COALESCE(p.custo_medio, 0) AS valor_patrimonial
+                SELECT p.codigo_interno, p.nome AS produto_nome,
+                       e.quantidade, a.nome AS almoxarifado_nome
                 FROM estoque e
                 LEFT JOIN produtos p ON e.produto_id = p.id
                 LEFT JOIN almoxarifados a ON e.almoxarifado_id = a.id
@@ -2011,16 +2008,16 @@ def exportar_estoque():
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "Estoque"
-        cabecalhos = ['Código Interno', 'Produto', 'Categoria', 'Almoxarifado',
-                      'Qtd. Atual', 'Est. Mínimo', 'Custo Médio', 'Valor Patrimonial']
+        # Headers compatíveis com o importador
+        cabecalhos = ['codigo_interno', 'quantidade', 'almoxarifado']
         ws.append(cabecalhos)
         for cell in ws[1]:
             cell.font = openpyxl.styles.Font(bold=True)
         for row in rows:
             ws.append([
-                row['codigo_interno'], row['produto_nome'], row['categoria'],
-                row['almoxarifado_nome'], row['quantidade'], row['estoque_minimo'],
-                row['custo_medio'], row['valor_patrimonial']
+                row['codigo_interno'],
+                row['quantidade'],
+                row['almoxarifado_nome'] or ''
             ])
         for col in ws.columns:
             max_len = max((len(str(c.value or '')) for c in col), default=0)
