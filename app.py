@@ -2769,15 +2769,25 @@ def etiqueta_produto(id):
 def buscar_colaborador_por_codigo():
     codigo = request.args.get('codigo_barras', '').strip()
     if not codigo:
-        return response(False, message='Informe o código de barras.', status_code=400)
+        return response(False, message='Informe o código de barras ou matrícula.', status_code=400)
     try:
         with get_connection() as conn:
+            # Primeiro tenta por código de barras
             row = conn.execute(
                 'SELECT id, nome, matricula, setor FROM colaboradores WHERE codigo_barras = ? AND ativo = 1',
                 (codigo,)
             ).fetchone()
+            
+            # Se não achou, tenta por matrícula
             if not row:
-                return response(False, message='Colaborador não encontrado ou inativo.', status_code=404)
+                row = conn.execute(
+                    'SELECT id, nome, matricula, setor FROM colaboradores WHERE matricula = ? AND ativo = 1',
+                    (codigo,)
+                ).fetchone()
+
+            if not row:
+                return response(False, message='Colaborador não encontrado ou inativo. Verifique o código ou matrícula.', status_code=404)
+            
             return response(True, data=dict(row))
     except Exception as e:
         return response(False, message=str(e), status_code=500)
