@@ -1988,6 +1988,92 @@ def enviar_unidades_manutencao_lote():
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
+@app.route('/unidades/busca', methods=['GET'])
+@jwt_required()
+def buscar_unidade_por_tag():
+    tag = request.args.get('tag', '').strip()
+    if not tag:
+        return response(False, message='Informe a TAG da unidade.', status_code=400)
+    try:
+        with get_connection() as conn:
+            row = conn.execute("""
+                SELECT u.id, u.tag, u.status, u.numero_serie, u.almoxarifado_id,
+                       p.id as produto_id, p.nome as produto_nome, p.codigo_interno,
+                       p.natureza, p.custo_medio, e.nome as equipamento_nome
+                FROM unidades u
+                LEFT JOIN produtos p ON u.produto_id = p.id
+                WHERE u.tag = ? AND u.status = 'disponivel'
+                LIMIT 1
+            """, (tag,)).fetchone()
+            if not row:
+                return response(False, message='Unidade não encontrada ou indisponível.', status_code=404)
+            return response(True, data=dict(row))
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/movimentacoes/emprestimo-rapido', methods=['POST'])
+@jwt_required()
+def emprestimo_rapido():
+    data = request.get_json()
+    if not data:
+        return response(False, message='Dados inválidos.', status_code=400)
+    
+    colaborador_id = data.get('colaborador_id')
+    almoxarifado_id = data.get('almoxarifado_id')
+    itens = data.get('itens', [])
+    
+    if not colaborador_id or not itens:
+        return response(False, message='Colaborador e itens são obrigatórios.', status_code=400)
+    
+    try:
+        with get_connection() as conn:
+            resultados = []
+            for item in itens:
+                unidade_id = item.get('unidade_id')
+                produto_id = item.get('produto_id')
+                
+                if not unidade_id:
+                    continue
+                
+                # Verifica se a unidade ainda está disponível
+                unidade = conn.execute(
+                    'SELECT id, tag, status FROM unidades WHERE id = ? AND status = ?',
+                    (unidade_id, 'disponivel')
+                ).fetchone()
+                
+                if not unidade:
+                    return response(False, message=f'Unidade TAG {item.get("tag", unidade_id)} não está mais disponível.', status_code=409)
+                
+                # Cria o empréstimo
+                cursor = conn.execute("""
+                    INSERT INTO emprestimos (unidade_id, colaborador_id, data_emprestimo, status, tipo)
+                    VALUES (?, ?, datetime('now', '-3 hours'), 'ativo', 'emprestimo')
+                """, (unidade_id, colaborador_id))
+                
+                # Atualiza status da unidade
+                conn.execute(
+                    "UPDATE unidades SET status = 'emprestado', localizacao = (SELECT nome FROM colaboradores WHERE id = ?) WHERE id = ?",
+                    (colaborador_id, unidade_id)
+                )
+                
+                # Registra na movimentações
+                conn.execute("""
+                    INSERT INTO movimentacoes (tipo, produto_id, unidade_id, colaborador_id, almoxarifado_id, quantidade, observacao, created_at)
+                    VALUES ('saida', ?, ?, ?, ?, 1, 'Empréstimo rápido via movimentação rápida', datetime('now', '-3 hours'))
+                """, (produto_id, unidade_id, colaborador_id, almoxarifado_id))
+                
+                resultados.append({
+                    'unidade_id': unidade_id,
+                    'tag': item.get('tag', ''),
+                    'produto_nome': item.get('produto_nome', ''),
+                    'status': 'emprestado'
+                })
+            
+            conn.commit()
+            return response(True, message=f'{len(resultados)} unidade(s) emprestada(s) com sucesso!', data={'itens': resultados})
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
 # ============================================================
 # ESTOQUE
 # ============================================================

@@ -5392,44 +5392,112 @@ async function buscarColaborador() {
 
 async function buscarProdutoRapido() {
     const codigo = document.getElementById('input-codigo-produto').value.trim();
-    if (!codigo) { showRapidMessage('Informe o código do produto.', 'error'); return; }
+    if (!codigo) { showRapidMessage('Informe o código do produto ou TAG.', 'error'); return; }
     if (!colaboradorRapido) { showRapidMessage('Identifique o colaborador primeiro.', 'error'); return; }
+
+    // Primeiro tenta como produto
     try {
         const res = await fetch(`${API_BASE}/produtos/busca?codigo=${encodeURIComponent(codigo)}`, { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
         const data = await res.json();
         if (data.success) {
             const p = data.data;
-            const info = document.getElementById('produto-info');
-            info.style.display = 'block';
-            const naturezaIcon = p.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível';
-            const naturezaCor = p.natureza === 'emprestimo' ? '#d97706' : '#059669';
-            info.innerHTML = `<div><strong>${p.nome}</strong></div>
-                <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
-                    <span>Cód: ${p.codigo_interno || '-'}</span>
-                    <span>Estoque: <strong>${p.quantidade_estoque}</strong></span>
-                    <span style="color:${naturezaCor};font-weight:600;">${naturezaIcon}</span>
-                </div>`;
+            exibirProdutoEncontrado(p);
+            return;
+        }
+    } catch (e) {
+        // Se falhou, tenta como unidade
+    }
 
-            if (modoRapido === 'retirada') {
-                const acoes = document.getElementById('produto-acoes');
-                acoes.style.display = 'block';
-                document.getElementById('rapid-qtd').value = 1;
-                document.getElementById('rapid-qtd').max = p.quantidade_estoque;
-                document.getElementById('btn-adicionar-item').onclick = () => adicionarItemRetirada(p);
-                document.getElementById('rapid-qtd').focus();
-                document.getElementById('rapid-qtd').select();
-            } else {
-                // Devolução - busca pendências
-                document.getElementById('produto-acoes').style.display = 'none';
-                await devolverItem(p.id);
-            }
+    // Se não achou como produto, tenta como unidade (TAG)
+    try {
+        const res = await fetch(`${API_BASE}/unidades/busca?tag=${encodeURIComponent(codigo)}`, { headers: authHeaders() });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const data = await res.json();
+        if (data.success) {
+            const u = data.data;
+            u.eh_unidade = true; // Marca que é unidade
+            exibirProdutoEncontrado(u);
         } else {
-            showRapidMessage('Produto não encontrado.', 'error');
+            showRapidMessage('Produto ou TAG não encontrado.', 'error');
         }
     } catch (err) {
-        showRapidMessage('Erro ao buscar produto: ' + err.message, 'error');
+        showRapidMessage('Erro ao buscar: ' + err.message, 'error');
     }
+}
+
+function exibirProdutoEncontrado(item) {
+    const info = document.getElementById('produto-info');
+    info.style.display = 'block';
+
+    if (item.eh_unidade) {
+        // É uma unidade/ferramenta
+        const nome = item.produto_nome || 'Ferramenta';
+        info.innerHTML = `<div><strong>🔧 ${nome}</strong> <span style="background:#dbeafe;padding:2px 8px;border-radius:4px;font-size:11px;color:#1d4ed8;">TAG: ${item.tag}</span></div>
+            <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
+                <span>Nº Série: ${item.numero_serie || '-'}</span>
+                <span style="color:#d97706;font-weight:600;">🔄 Empréstimo</span>
+            </div>`;
+        
+        // Empréstimo não usa quantidade - já adiciona direto
+        document.getElementById('produto-acoes').style.display = 'block';
+        document.getElementById('rapid-qtd').value = 1;
+        document.getElementById('rapid-qtd').max = 1;
+        document.getElementById('btn-adicionar-item').onclick = () => adicionarItemUnidade(item);
+        document.getElementById('rapid-qtd').focus();
+    } else {
+        // É um produto normal
+        const naturezaIcon = item.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível';
+        const naturezaCor = item.natureza === 'emprestimo' ? '#d97706' : '#059669';
+        info.innerHTML = `<div><strong>${item.nome}</strong></div>
+            <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
+                <span>Cód: ${item.codigo_interno || '-'}</span>
+                <span>Estoque: <strong>${item.quantidade_estoque}</strong></span>
+                <span style="color:${naturezaCor};font-weight:600;">${naturezaIcon}</span>
+            </div>`;
+
+        if (modoRapido === 'retirada') {
+            document.getElementById('produto-acoes').style.display = 'block';
+            document.getElementById('rapid-qtd').value = 1;
+            document.getElementById('rapid-qtd').max = item.quantidade_estoque;
+            document.getElementById('btn-adicionar-item').onclick = () => adicionarItemRetirada(item);
+            document.getElementById('rapid-qtd').focus();
+            document.getElementById('rapid-qtd').select();
+        } else {
+            document.getElementById('produto-acoes').style.display = 'none';
+            devolverItem(item.id);
+        }
+    }
+}
+
+function adicionarItemUnidade(unidade) {
+    // Verifica se a TAG já foi adicionada
+    const existente = itensRapido.find(i => i.unidade_id === unidade.id);
+    if (existente) {
+        showRapidMessage(`⚠️ TAG ${unidade.tag} já está na lista.`, 'error');
+        return;
+    }
+
+    const nome = unidade.produto_nome || 'Ferramenta';
+
+    itensRapido.push({
+        unidade_id: unidade.id,
+        produto_id: unidade.produto_id,
+        produto_nome: nome,
+        tag: unidade.tag,
+        codigo_interno: unidade.codigo_interno || unidade.tag,
+        natureza: 'emprestimo',
+        quantidade: 1,
+        eh_unidade: true
+    });
+
+    renderItensRapido();
+    document.getElementById('input-codigo-produto').value = '';
+    document.getElementById('input-codigo-produto').focus();
+    document.getElementById('produto-info').style.display = 'none';
+    document.getElementById('produto-acoes').style.display = 'none';
+    showRapidMessage(`✅ TAG ${unidade.tag} (${nome}) adicionada para empréstimo!`, 'success');
+    setTimeout(() => showRapidMessage('', ''), 2000);
 }
 
 function adicionarItemRetirada(produto) {
@@ -5471,8 +5539,8 @@ function renderItensRapido() {
     const contador = document.getElementById('rapid-contador');
     const btnFinalizar = document.getElementById('btn-finalizar-retirada');
 
-    tbody.innerHTML = '';
     if (itensRapido.length === 0) {
+        tbody.innerHTML = '';
         vazio.style.display = 'block';
         contador.textContent = '0 itens';
         btnFinalizar.disabled = true;
@@ -5483,78 +5551,126 @@ function renderItensRapido() {
     contador.textContent = `${itensRapido.length} item(ns)`;
     btnFinalizar.disabled = false;
 
-    itensRapido.forEach((item, idx) => {
-        const naturezaIcon = item.natureza === 'emprestimo' ? '🔄' : '✅';
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${item.codigo_interno || '-'}</td>
-            <td>${item.produto_nome}</td>
-            <td>${naturezaIcon} ${item.natureza === 'emprestimo' ? 'Empréstimo' : 'Consumível'}</td>
-            <td style="text-align:center;font-weight:700;">${item.quantidade}</td>
+    tbody.innerHTML = itensRapido.map((item, idx) => {
+        const icone = item.eh_unidade ? '🔧' : '📦';
+        const naturezaLabel = item.eh_unidade || item.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível';
+        const codigo = item.tag || item.codigo_interno || '-';
+        return `<tr>
+            <td><strong>${codigo}</strong></td>
+            <td>${icone} ${item.produto_nome}</td>
+            <td>${naturezaLabel}</td>
+            <td style="text-align:center;">${item.quantidade}</td>
             <td style="text-align:center;">
-                <button class="btn-sm btn-danger" onclick="removerItemRapido(${idx})">✕</button>
+                <button onclick="removerItemRapido(${idx})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;" title="Remover">✕</button>
             </td>
-        `;
-        tbody.appendChild(tr);
-    });
+        </tr>`;
+    }).join('');
 }
 
 function removerItemRapido(idx) {
     itensRapido.splice(idx, 1);
     renderItensRapido();
+    showRapidMessage('Item removido.', 'info');
+    setTimeout(() => showRapidMessage('', ''), 1500);
 }
 
 async function finalizarRetirada() {
-    if (itensRapido.length === 0) { showRapidMessage('Nenhum item para retirar.', 'error'); return; }
+    if (itensRapido.length === 0) { showRapidMessage('Nenhum item para processar.', 'error'); return; }
     if (!colaboradorRapido) { showRapidMessage('Colaborador não identificado.', 'error'); return; }
-    
+
     const almoxarifadoId = document.getElementById('rapid-almoxarifado').value;
     if (!almoxarifadoId) {
-        showRapidMessage('Selecione o almoxarifado de origem.', 'error');
+        showRapidMessage('Selecione o almoxarifado.', 'error');
         return;
     }
-    
+
     const btn = document.getElementById('btn-finalizar-retirada');
     btn.disabled = true;
     btn.textContent = '⏳ Registrando...';
-    
-    try {
-        const res = await fetch(`${API_BASE}/movimentacoes/retirada-rapida`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            },
-            body: JSON.stringify({
-                colaborador_id: colaboradorRapido.id,
-                almoxarifado_id: parseInt(almoxarifadoId),
-                itens: itensRapido.map(i => ({
-                    produto_id: i.produto_id,
-                    quantidade: i.quantidade
-                }))
-            })
-        });
-        
-        const data = await res.json();
-        if (data.success) {
-            showRapidMessage(`✅ ${data.message}`, 'success');
-            btn.textContent = '✅ Finalizado!';
-            let resumo = data.data.itens.map(i =>
-                `${i.quantidade}x ${i.produto_nome} (${i.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível'})`
-            ).join('\n');
-            alert(`Retirada concluída para ${colaboradorRapido.nome}:\n\n${resumo}`);
-            limparRetirada();
-        } else {
-            showRapidMessage('Erro: ' + data.message, 'error');
-            btn.disabled = false;
-            btn.textContent = '✅ Finalizar Retirada';
+
+    // Separa itens normais (produtos) de unidades (empréstimo)
+    const itensProduto = itensRapido.filter(i => !i.eh_unidade);
+    const itensUnidade = itensRapido.filter(i => i.eh_unidade);
+
+    let erros = [];
+
+    // 1️⃣ Processa empréstimos de unidades/ferramentas
+    if (itensUnidade.length > 0) {
+        try {
+            const res = await fetch(`${API_BASE}/movimentacoes/emprestimo-rapido`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({
+                    colaborador_id: colaboradorRapido.id,
+                    almoxarifado_id: parseInt(almoxarifadoId),
+                    itens: itensUnidade.map(i => ({
+                        unidade_id: i.unidade_id,
+                        produto_id: i.produto_id,
+                        tag: i.tag,
+                        produto_nome: i.produto_nome
+                    }))
+                })
+            });
+            const data = await res.json();
+            if (!data.success) {
+                erros.push('Empréstimo: ' + data.message);
+            }
+        } catch (err) {
+            erros.push('Erro no empréstimo: ' + err.message);
         }
-    } catch (err) {
-        showRapidMessage('Erro: ' + err.message, 'error');
+    }
+
+    // 2️⃣ Processa retirada de produtos normais
+    if (itensProduto.length > 0) {
+        try {
+            const res = await fetch(`${API_BASE}/movimentacoes/retirada-rapida`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({
+                    colaborador_id: colaboradorRapido.id,
+                    almoxarifado_id: parseInt(almoxarifadoId),
+                    itens: itensProduto.map(i => ({
+                        produto_id: i.produto_id,
+                        quantidade: i.quantidade
+                    }))
+                })
+            });
+            const data = await res.json();
+            if (!data.success) {
+                erros.push('Retirada: ' + data.message);
+            }
+        } catch (err) {
+            erros.push('Erro na retirada: ' + err.message);
+        }
+    }
+
+    btn.textContent = '✅ Finalizar Retirada';
+
+    if (erros.length === 0) {
+        showRapidMessage('✅ Operação concluída com sucesso!', 'success');
+        let resumo = '';
+        if (itensUnidade.length > 0) {
+            resumo += `🔧 ${itensUnidade.length} ferramenta(s) emprestada(s)\n`;
+        }
+        if (itensProduto.length > 0) {
+            const totalQtd = itensProduto.reduce((s, i) => s + i.quantidade, 0);
+            resumo += `📦 ${totalQtd} item(ns) retirado(s)`;
+        }
+        alert(`Movimentação concluída para ${colaboradorRapido.nome}:\n\n${resumo}`);
+        limparRetirada();
+    } else {
+        showRapidMessage('⚠️ ' + erros.join(' | '), 'error');
         btn.disabled = false;
-        btn.textContent = '✅ Finalizar Retirada';
     }
 }
+
+
 
 async function devolverItem(produtoId) {
     if (!colaboradorRapido) { showRapidMessage('Identifique o colaborador primeiro.', 'error'); return; }
