@@ -2044,11 +2044,11 @@ def emprestimo_rapido():
                 if not unidade:
                     return response(False, message=f'Unidade TAG {item.get("tag", unidade_id)} não está mais disponível.', status_code=409)
                 
-                # Cria o empréstimo
-                cursor = conn.execute("""
-                    INSERT INTO emprestimos (unidade_id, colaborador_id, data_emprestimo, status, tipo)
-                    VALUES (?, ?, NOW() - INTERVAL '3 hours', 'ativo', 'emprestimo')
-                """, (unidade_id, colaborador_id))
+                # Cria o empréstimo cursor
+                conn.execute("""
+                    INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW() - INTERVAL '3 hours')
+                """, ('saida', produto_id, unidade_id, colaborador_id, almoxarifado_id, 1, 'Empréstimo rápido via movimentação rápida', 'emprestimo'))
                 
                 # Atualiza status da unidade
                 conn.execute(
