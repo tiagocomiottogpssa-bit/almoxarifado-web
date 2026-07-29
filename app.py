@@ -2046,7 +2046,7 @@ def emprestimo_rapido():
                 
                 # Cria o empréstimo cursor
                 conn.execute("""
-                    INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, created_at)
+                    INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, data)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW() - INTERVAL '3 hours')
                 """, ('saida', produto_id, unidade_id, colaborador_id, almoxarifado_id, 1, 'Empréstimo rápido via movimentação rápida', 'emprestimo'))
                 
