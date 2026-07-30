@@ -2056,11 +2056,6 @@ def emprestimo_rapido():
                     (colaborador_id, unidade_id)
                 )
                 
-                # Registra na movimentações
-                conn.execute("""
-                    INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, data)
-                    VALUES ('saida', ?, ?, ?, ?, 1, 'Empréstimo rápido via movimentação rápida', NOW() - INTERVAL '3 hours')
-                """, ('saida', produto_id, unidade_id, colaborador_id, almoxarifado_id, 1, 'Empréstimo rápido via movimentação rápida', 'emprestimo'))
                 
                 resultados.append({
                     'unidade_id': unidade_id,
