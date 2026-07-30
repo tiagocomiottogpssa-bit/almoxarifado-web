@@ -3048,9 +3048,9 @@ def retirada_rapida():
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
-@app.route('/movimentacoes/devolucao-rapida', methods=['POST'])
+@app.route('/movimentacoes/devolucao-unidade', methods=['POST'])
 @jwt_required()
-def devolucao_rapida():
+def devolucao_unidade():
     data = request.get_json(silent=True) or {}
     colaborador_id = data.get('colaborador_id')
     produto_id = data.get('produto_id')
