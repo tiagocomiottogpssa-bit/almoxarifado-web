@@ -2002,11 +2002,11 @@ def buscar_unidade_por_tag():
                        p.custo_medio
                 FROM unidades u
                 LEFT JOIN produtos p ON u.produto_id = p.id
-                WHERE u.tag = ? AND u.status = 'disponivel'
+                WHERE u.tag = ?
                 LIMIT 1
             """, (tag,)).fetchone()
             if not row:
-                return response(False, message='Unidade não encontrada ou indisponível.', status_code=404)
+                return response(False, message='Unidade não encontrada', status_code=404)
             return response(True, data=dict(row))
     except Exception as e:
         return response(False, message=str(e), status_code=500)
@@ -2049,13 +2049,18 @@ def emprestimo_rapido():
                     INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, data)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW() - INTERVAL '3 hours')
                 """, ('saida', produto_id, unidade_id, colaborador_id, almoxarifado_id, 1, 'Empréstimo rápido via movimentação rápida', 'emprestimo'))
+
+                # Cria registro na tabela emprestimos
+                conn.execute("""
+                    INSERT INTO emprestimos (unidade_id, colaborador_id, data_emprestimo, status, tipo)
+                    VALUES (?, ?, NOW() - INTERVAL '3 hours', 'ativo', 'emprestimo')
+                """, (unidade_id, colaborador_id))
                 
                 # Atualiza status da unidade
                 conn.execute(
                     "UPDATE unidades SET status = 'emprestado', localizacao = (SELECT nome FROM colaboradores WHERE id = ?) WHERE id = ?",
                     (colaborador_id, unidade_id)
                 )
-                
                 
                 resultados.append({
                     'unidade_id': unidade_id,
@@ -2066,6 +2071,53 @@ def emprestimo_rapido():
             
             conn.commit()
             return response(True, message=f'{len(resultados)} unidade(s) emprestada(s) com sucesso!', data={'itens': resultados})
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/movimentacoes/devolucao-rapida', methods=['POST'])
+@jwt_required()
+def devolucao_rapida():
+    data = request.get_json()
+    if not data:
+        return response(False, message='Dados inválidos.', status_code=400)
+    
+    colaborador_id = data.get('colaborador_id')
+    almoxarifado_id = data.get('almoxarifado_id')
+    itens = data.get('itens', [])
+    
+    if not itens:
+        return response(False, message='Itens são obrigatórios.', status_code=400)
+    
+    try:
+        with get_connection() as conn:
+            for item in itens:
+                unidade_id = item.get('unidade_id')
+                produto_id = item.get('produto_id')
+                
+                if not unidade_id:
+                    continue
+                
+                # Atualiza empréstimo ativo para devolvido
+                conn.execute("""
+                    UPDATE emprestimos 
+                    SET status = 'devolvido', data_devolucao = NOW() - INTERVAL '3 hours'
+                    WHERE unidade_id = ? AND status = 'ativo'
+                """, (unidade_id,))
+                
+                # Atualiza status da unidade para disponível
+                conn.execute(
+                    "UPDATE unidades SET status = 'disponivel', localizacao = NULL WHERE id = ?",
+                    (unidade_id,)
+                )
+                
+                # Registra na movimentações como entrada
+                conn.execute("""
+                    INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, data)
+                    VALUES ('entrada', ?, ?, ?, ?, 1, 'Devolução rápida via movimentação rápida', 'emprestimo', NOW() - INTERVAL '3 hours')
+                """, (produto_id, unidade_id, colaborador_id, almoxarifado_id))
+            
+            conn.commit()
+            return response(True, message=f'{len(itens)} unidade(s) devolvida(s) com sucesso!')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 

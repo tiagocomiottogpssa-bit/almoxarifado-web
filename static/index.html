@@ -5430,44 +5430,36 @@ function exibirProdutoEncontrado(item) {
     const info = document.getElementById('produto-info');
     info.style.display = 'block';
 
-    if (item.eh_unidade) {
-        // É uma unidade/ferramenta
-        const nome = item.produto_nome || 'Ferramenta';
-        info.innerHTML = `<div><strong>🔧 ${nome}</strong> <span style="background:#dbeafe;padding:2px 8px;border-radius:4px;font-size:11px;color:#1d4ed8;">TAG: ${item.tag}</span></div>
-            <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
-                <span>Nº Série: ${item.numero_serie || '-'}</span>
-                <span style="color:#d97706;font-weight:600;">🔄 Empréstimo</span>
-            </div>`;
-        
-        // Empréstimo não usa quantidade - já adiciona direto
-        document.getElementById('produto-acoes').style.display = 'block';
-        document.getElementById('rapid-qtd').value = 1;
-        document.getElementById('rapid-qtd').max = 1;
-        document.getElementById('btn-adicionar-item').onclick = () => adicionarItemUnidade(item);
-        document.getElementById('rapid-qtd').focus();
-    } else {
-        // É um produto normal
-        const naturezaIcon = item.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível';
-        const naturezaCor = item.natureza === 'emprestimo' ? '#d97706' : '#059669';
-        info.innerHTML = `<div><strong>${item.nome}</strong></div>
-            <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
-                <span>Cód: ${item.codigo_interno || '-'}</span>
-                <span>Estoque: <strong>${item.quantidade_estoque}</strong></span>
-                <span style="color:${naturezaCor};font-weight:600;">${naturezaIcon}</span>
-            </div>`;
-
-        if (modoRapido === 'retirada') {
-            document.getElementById('produto-acoes').style.display = 'block';
-            document.getElementById('rapid-qtd').value = 1;
-            document.getElementById('rapid-qtd').max = item.quantidade_estoque;
-            document.getElementById('btn-adicionar-item').onclick = () => adicionarItemRetirada(item);
-            document.getElementById('rapid-qtd').focus();
-            document.getElementById('rapid-qtd').select();
-        } else {
-            document.getElementById('produto-acoes').style.display = 'none';
-            devolverItem(item.id);
+        if (item.eh_unidade) {
+            const nome = item.produto_nome || 'Ferramenta';
+            const statusIcon = item.status === 'emprestado' ? '🔴 Emprestado' : '🟢 Disponível';
+            const statusCor = item.status === 'emprestado' ? '#dc2626' : '#16a34a';
+    
+            info.innerHTML = `<div><strong>🔧 ${nome}</strong> <span style="background:#dbeafe;padding:2px 8px;border-radius:4px;font-size:11px;color:#1d4ed8;">TAG: ${item.tag}</span></div>
+                <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
+                    <span>Nº Série: ${item.numero_serie || '-'}</span>
+                    <span style="color:${statusCor};font-weight:600;">${statusIcon}</span>
+                </div>`;
+    
+            if (modoRapido === 'retirada' && item.status === 'disponivel') {
+                document.getElementById('produto-acoes').style.display = 'block';
+                document.getElementById('rapid-qtd').value = 1;
+                document.getElementById('rapid-qtd').max = 1;
+                document.getElementById('btn-adicionar-item').onclick = () => adicionarItemUnidade(item);
+                document.getElementById('rapid-qtd').focus();
+            } else if (modoRapido === 'devolucao' && item.status === 'emprestado') {
+                document.getElementById('produto-acoes').style.display = 'block';
+                document.getElementById('rapid-qtd').value = 1;
+                document.getElementById('rapid-qtd').max = 1;
+                document.getElementById('btn-adicionar-item').onclick = () => adicionarItemDevolucaoUnidade(item);
+                document.getElementById('rapid-qtd').focus();
+            } else {
+                document.getElementById('produto-acoes').style.display = 'none';
+                const msg = modoRapido === 'retirada' ? 'Unidade não está disponível para empréstimo.' : 'Unidade não está emprestada.';
+                showRapidMessage('⚠️ ' + msg, 'error');
+                setTimeout(() => showRapidMessage('', ''), 3000);
+            }
         }
-    }
 }
 
 function adicionarItemUnidade(unidade) {
@@ -5553,7 +5545,7 @@ function renderItensRapido() {
 
     tbody.innerHTML = itensRapido.map((item, idx) => {
         const icone = item.eh_unidade ? '🔧' : '📦';
-        const naturezaLabel = item.eh_unidade || item.natureza === 'emprestimo' ? '🔄 Empréstimo' : '✅ Consumível';
+        const acaoLabel = item.tipo === 'devolucao' ? '📥 Devolução' : (item.eh_unidade ? '🔄 Empréstimo' : '✅ Consumível');
         const codigo = item.tag || item.codigo_interno || '-';
         return `<tr>
             <td><strong>${codigo}</strong></td>
@@ -5588,13 +5580,38 @@ async function finalizarRetirada() {
     btn.disabled = true;
     btn.textContent = '⏳ Registrando...';
 
-    // Separa itens normais (produtos) de unidades (empréstimo)
-    const itensProduto = itensRapido.filter(i => !i.eh_unidade);
-    const itensUnidade = itensRapido.filter(i => i.eh_unidade);
+    const itensDevolucao = itensRapido.filter(i => i.tipo === 'devolucao');
+    const itensRetirada = itensRapido.filter(i => !i.tipo || i.tipo !== 'devolucao');
+    const itensProduto = itensRetirada.filter(i => !i.eh_unidade);
+    const itensUnidade = itensRetirada.filter(i => i.eh_unidade);
 
     let erros = [];
 
-    // 1️⃣ Processa empréstimos de unidades/ferramentas
+    if (itensDevolucao.length > 0) {
+        try {
+            const res = await fetch(`${API_BASE}/movimentacoes/devolucao-rapida`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({
+                    colaborador_id: colaboradorRapido.id,
+                    almoxarifado_id: parseInt(almoxarifadoId),
+                    itens: itensDevolucao.map(i => ({
+                        unidade_id: i.unidade_id,
+                        produto_id: i.produto_id,
+                        tag: i.tag
+                    }))
+                })
+            });
+            const data = await res.json();
+            if (!data.success) erros.push('Devolução: ' + data.message);
+        } catch (err) {
+            erros.push('Erro na devolução: ' + err.message);
+        }
+    }
+
     if (itensUnidade.length > 0) {
         try {
             const res = await fetch(`${API_BASE}/movimentacoes/emprestimo-rapido`, {
@@ -5615,15 +5632,12 @@ async function finalizarRetirada() {
                 })
             });
             const data = await res.json();
-            if (!data.success) {
-                erros.push('Empréstimo: ' + data.message);
-            }
+            if (!data.success) erros.push('Empréstimo: ' + data.message);
         } catch (err) {
             erros.push('Erro no empréstimo: ' + err.message);
         }
     }
 
-    // 2️⃣ Processa retirada de produtos normais
     if (itensProduto.length > 0) {
         try {
             const res = await fetch(`${API_BASE}/movimentacoes/retirada-rapida`, {
@@ -5642,9 +5656,7 @@ async function finalizarRetirada() {
                 })
             });
             const data = await res.json();
-            if (!data.success) {
-                erros.push('Retirada: ' + data.message);
-            }
+            if (!data.success) erros.push('Retirada: ' + data.message);
         } catch (err) {
             erros.push('Erro na retirada: ' + err.message);
         }
@@ -5655,9 +5667,8 @@ async function finalizarRetirada() {
     if (erros.length === 0) {
         showRapidMessage('✅ Operação concluída com sucesso!', 'success');
         let resumo = '';
-        if (itensUnidade.length > 0) {
-            resumo += `🔧 ${itensUnidade.length} ferramenta(s) emprestada(s)\n`;
-        }
+        if (itensDevolucao.length > 0) resumo += `📥 ${itensDevolucao.length} ferramenta(s) devolvida(s)\n`;
+        if (itensUnidade.length > 0) resumo += `🔧 ${itensUnidade.length} ferramenta(s) emprestada(s)\n`;
         if (itensProduto.length > 0) {
             const totalQtd = itensProduto.reduce((s, i) => s + i.quantidade, 0);
             resumo += `📦 ${totalQtd} item(ns) retirado(s)`;
@@ -5670,7 +5681,31 @@ async function finalizarRetirada() {
     }
 }
 
+function adicionarItemDevolucaoUnidade(unidade) {
+    const existente = itensRapido.find(i => i.unidade_id === unidade.id);
+    if (existente) {
+        showRapidMessage(`⚠️ TAG ${unidade.tag} já está na lista.`, 'error');
+        return;
+    }
 
+    itensRapido.push({
+        unidade_id: unidade.id,
+        produto_id: unidade.produto_id,
+        produto_nome: unidade.produto_nome || 'Ferramenta',
+        tag: unidade.tag,
+        quantidade: 1,
+        eh_unidade: true,
+        tipo: 'devolucao'
+    });
+
+    renderItensRapido();
+    document.getElementById('input-codigo-produto').value = '';
+    document.getElementById('input-codigo-produto').focus();
+    document.getElementById('produto-info').style.display = 'none';
+    document.getElementById('produto-acoes').style.display = 'none';
+    showRapidMessage(`✅ TAG ${unidade.tag} adicionada para devolução!`, 'success');
+    setTimeout(() => showRapidMessage('', ''), 2000);
+}
 
 async function devolverItem(produtoId) {
     if (!colaboradorRapido) { showRapidMessage('Identifique o colaborador primeiro.', 'error'); return; }
