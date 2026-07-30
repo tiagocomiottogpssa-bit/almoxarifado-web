@@ -5589,7 +5589,7 @@ async function finalizarRetirada() {
 
     if (itensDevolucao.length > 0) {
         try {
-            const res = await fetch(`${API_BASE}/movimentacoes/devolucao-unidade`, {
+            const res = await fetch(`${API_BASE}/movimentacoes/devolucao-rapida`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
