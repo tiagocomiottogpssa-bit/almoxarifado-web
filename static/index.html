@@ -5430,36 +5430,65 @@ function exibirProdutoEncontrado(item) {
     const info = document.getElementById('produto-info');
     info.style.display = 'block';
 
-        if (item.eh_unidade) {
-            const nome = item.produto_nome || 'Ferramenta';
-            const statusIcon = item.status === 'emprestado' ? '🔴 Emprestado' : '🟢 Disponível';
-            const statusCor = item.status === 'emprestado' ? '#dc2626' : '#16a34a';
-    
-            info.innerHTML = `<div><strong>🔧 ${nome}</strong> <span style="background:#dbeafe;padding:2px 8px;border-radius:4px;font-size:11px;color:#1d4ed8;">TAG: ${item.tag}</span></div>
-                <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
-                    <span>Nº Série: ${item.numero_serie || '-'}</span>
-                    <span style="color:${statusCor};font-weight:600;">${statusIcon}</span>
-                </div>`;
-    
-            if (modoRapido === 'retirada' && item.status === 'disponivel') {
-                document.getElementById('produto-acoes').style.display = 'block';
-                document.getElementById('rapid-qtd').value = 1;
-                document.getElementById('rapid-qtd').max = 1;
-                document.getElementById('btn-adicionar-item').onclick = () => adicionarItemUnidade(item);
-                document.getElementById('rapid-qtd').focus();
-            } else if (modoRapido === 'devolucao' && item.status === 'emprestado') {
-                document.getElementById('produto-acoes').style.display = 'block';
-                document.getElementById('rapid-qtd').value = 1;
-                document.getElementById('rapid-qtd').max = 1;
-                document.getElementById('btn-adicionar-item').onclick = () => adicionarItemDevolucaoUnidade(item);
-                document.getElementById('rapid-qtd').focus();
-            } else {
-                document.getElementById('produto-acoes').style.display = 'none';
-                const msg = modoRapido === 'retirada' ? 'Unidade não está disponível para empréstimo.' : 'Unidade não está emprestada.';
-                showRapidMessage('⚠️ ' + msg, 'error');
+    if (item.eh_unidade) {
+        // === TAG / Ferramenta ===
+        const nome = item.produto_nome || 'Ferramenta';
+        const statusIcon = item.status === 'emprestado' ? '🔴 Emprestado' : '🟢 Disponível';
+        const statusCor = item.status === 'emprestado' ? '#dc2626' : '#16a34a';
+
+        info.innerHTML = `<div><strong>🔧 ${nome}</strong> <span style="background:#dbeafe;padding:2px 8px;border-radius:4px;font-size:11px;color:#1d4ed8;">TAG: ${item.tag}</span></div>
+            <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
+                <span>Nº Série: ${item.numero_serie || '-'}</span>
+                <span style="color:${statusCor};font-weight:600;">${statusIcon}</span>
+            </div>`;
+
+        if (modoRapido === 'retirada' && item.status === 'disponivel') {
+            document.getElementById('produto-acoes').style.display = 'block';
+            document.getElementById('rapid-qtd').value = 1;
+            document.getElementById('rapid-qtd').max = 1;
+            document.getElementById('btn-adicionar-item').onclick = () => adicionarItemUnidade(item);
+            document.getElementById('rapid-qtd').focus();
+        } else if (modoRapido === 'devolucao' && item.status === 'emprestado') {
+            document.getElementById('produto-acoes').style.display = 'block';
+            document.getElementById('rapid-qtd').value = 1;
+            document.getElementById('rapid-qtd').max = 1;
+            document.getElementById('btn-adicionar-item').onclick = () => adicionarItemDevolucaoUnidade(item);
+            document.getElementById('rapid-qtd').focus();
+        } else {
+            document.getElementById('produto-acoes').style.display = 'none';
+            const msg = modoRapido === 'retirada' ? 'Unidade não está disponível para empréstimo.' : 'Unidade não está emprestada.';
+            showRapidMessage('⚠️ ' + msg, 'error');
+            setTimeout(() => showRapidMessage('', ''), 3000);
+        }
+    } else {
+        // === Produto comum (estoque) ===
+        const qtd = item.quantidade_estoque || 0;
+        const corQtd = qtd > 0 ? '#16a34a' : '#dc2626';
+
+        info.innerHTML = `<div><strong>📦 ${item.nome}</strong> <span style="background:#e0e7ff;padding:2px 8px;border-radius:4px;font-size:11px;color:#4338ca;">Cód: ${item.codigo_interno}</span></div>
+            <div style="display:flex;gap:16px;margin-top:4px;font-size:13px;color:#6b7280;">
+                <span>Categoria: ${item.categoria || '-'}</span>
+                <span style="color:${corQtd};font-weight:600;">Estoque: ${qtd} un</span>
+            </div>`;
+
+        if (modoRapido === 'retirada' && qtd > 0) {
+            document.getElementById('produto-acoes').style.display = 'block';
+            document.getElementById('rapid-qtd').value = 1;
+            document.getElementById('rapid-qtd').max = qtd;
+            document.getElementById('btn-adicionar-item').onclick = () => adicionarItemProduto(item);
+            document.getElementById('rapid-qtd').focus();
+        } else if (modoRapido === 'devolucao') {
+            document.getElementById('produto-acoes').style.display = 'none';
+            showRapidMessage('⚠️ Devolução de produto comum use o módulo de movimentações.', 'error');
+            setTimeout(() => showRapidMessage('', ''), 3000);
+        } else {
+            document.getElementById('produto-acoes').style.display = 'none';
+            if (qtd <= 0) {
+                showRapidMessage('⚠️ Produto sem estoque disponível.', 'error');
                 setTimeout(() => showRapidMessage('', ''), 3000);
             }
         }
+    }
 }
 
 function adicionarItemUnidade(unidade) {
@@ -5489,6 +5518,49 @@ function adicionarItemUnidade(unidade) {
     document.getElementById('produto-info').style.display = 'none';
     document.getElementById('produto-acoes').style.display = 'none';
     showRapidMessage(`✅ TAG ${unidade.tag} (${nome}) adicionada para empréstimo!`, 'success');
+    setTimeout(() => showRapidMessage('', ''), 2000);
+}
+
+function adicionarItemProduto(produto) {
+    const qtd = parseInt(document.getElementById('rapid-qtd').value) || 1;
+    if (qtd <= 0) { showRapidMessage('Informe uma quantidade válida.', 'error'); return; }
+    if (qtd > (produto.quantidade_estoque || 0)) {
+        showRapidMessage(`Estoque insuficiente. Disponível: ${produto.quantidade_estoque}`, 'error');
+        return;
+    }
+
+    const existente = itensRapido.find(i => i.produto_id === produto.id && !i.unidade_id);
+    if (existente) {
+        const novaQtd = existente.quantidade + qtd;
+        if (novaQtd > (produto.quantidade_estoque || 0)) {
+            showRapidMessage(`Estoque insuficiente. Disponível: ${produto.quantidade_estoque}`, 'error');
+            return;
+        }
+        existente.quantidade = novaQtd;
+        renderItensRapido();
+        document.getElementById('input-codigo-produto').value = '';
+        document.getElementById('input-codigo-produto').focus();
+        document.getElementById('produto-info').style.display = 'none';
+        document.getElementById('produto-acoes').style.display = 'none';
+        showRapidMessage(`✅ ${novaQtd}x ${produto.nome} atualizado na lista!`, 'success');
+        setTimeout(() => showRapidMessage('', ''), 2000);
+        return;
+    }
+
+    itensRapido.push({
+        produto_id: produto.id,
+        produto_nome: produto.nome,
+        codigo_interno: produto.codigo_interno,
+        quantidade: qtd,
+        eh_unidade: false
+    });
+
+    renderItensRapido();
+    document.getElementById('input-codigo-produto').value = '';
+    document.getElementById('input-codigo-produto').focus();
+    document.getElementById('produto-info').style.display = 'none';
+    document.getElementById('produto-acoes').style.display = 'none';
+    showRapidMessage(`✅ ${qtd}x ${produto.nome} adicionado!`, 'success');
     setTimeout(() => showRapidMessage('', ''), 2000);
 }
 
@@ -5550,7 +5622,7 @@ function renderItensRapido() {
         return `<tr>
             <td><strong>${codigo}</strong></td>
             <td>${icone} ${item.produto_nome}</td>
-            <td>${naturezaLabel}</td>
+            <td>${item.eh_unidade ? 'Ferramenta' : (item.natureza || 'Consumível')}</td>
             <td style="text-align:center;">${item.quantidade}</td>
             <td style="text-align:center;">
                 <button onclick="removerItemRapido(${idx})" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:18px;" title="Remover">✕</button>
