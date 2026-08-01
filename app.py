@@ -1948,7 +1948,7 @@ def enviar_unidades_manutencao_lote():
                 conn.execute(
                     '''UPDATE manutencoes_unidades
                        SET status = 'em_manutencao', fornecedor = ?, data_envio = ?
-                       WHERE unidade_id = ? AND status = 'aguardando_envio'''',
+                       WHERE unidade_id = ? AND status = 'aguardando_envio''',
                     (fornecedor, now_iso(), uid)
                 )
                 # Se não havia registro (caso raro), cria
