@@ -1973,9 +1973,9 @@ def enviar_unidades_manutencao_lote():
                 tag = row['tag'] or 'sem tag'
                 # Atualiza registro de manutenção aguardando_envio -> em_manutencao
                 conn.execute(
-                    '''UPDATE manutencoes_unidades
-                       SET status = 'em_manutencao', fornecedor = ?, data_envio = ?
-                       WHERE unidade_id = ? AND status = 'aguardando_envio''',
+                    """UPDATE manutencoes_unidades
+                    SET status = 'em_manutencao', fornecedor = ?, data_envio = ?
+                    WHERE unidade_id = ? AND status = 'aguardando_envio' """,
                     (fornecedor, now_iso(), uid)
                 )
                 # Se não havia registro (caso raro), cria
@@ -2203,7 +2203,7 @@ def devolucao_rapida():
                 """, (unidade_id,))
                 novo_status = 'com_defeito' if com_defeito else 'disponivel'
                 conn.execute(
-                    "UPDATE unidades SET status = ?, localizacao = NULL, almoxarifado_id = NULL WHERE id = ?",
+                    "UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?",
                     (novo_status, unidade_id)
                 )
                 if com_defeito:
@@ -3330,7 +3330,7 @@ def devolver_emprestimo():
                 )
             novo_status = 'com_defeito' if com_defeito else 'disponivel'
             conn.execute(
-                'UPDATE unidades SET status = ?, localizacao = NULL, almoxarifado_id = NULL WHERE id = ?',
+                'UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?',
                 (novo_status, unidade_id)
             )
             # Se com defeito, registra na manutenção (aguardando_envio)
