@@ -4884,7 +4884,7 @@ function fecharModalManutencaoLote() {
 }
 async function carregarSelectManutencaoLote() {
     const token = localStorage.getItem('access_token');
-    try { const res = await fetch(`${API_BASE}/almoxarifados`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const a = data.data || data || []; const s = document.getElementById('manut_lote_almoxarifado'); s.innerHTML = '<option value="">Selecione</option>'; a.forEach(x => s.innerHTML += `<option value="${x.id}">${x.nome}</option>`); } catch(e) { console.error(e); }
+    try { const res = await fetch(`${API_BASE}/almoxarifados`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const a = data.data || data || []; const s = document.getElementById('manut_lote_almoxarifado'); s.innerHTML = '<option value="">Todos os almoxarifados</option>'; a.forEach(x => s.innerHTML += `<option value="${x.id}">${x.nome}</option>`); } catch(e) { console.error(e); }
 }
 async function carregarUnidadesManutencaoLote() {
     const almoxId = document.getElementById('manut_lote_almoxarifado').value;
@@ -4892,14 +4892,14 @@ async function carregarUnidadesManutencaoLote() {
     unidadesManutencaoCache = [];
     if (!almoxId) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado.</div>'; atualizarContadorManutencao(); return; }
     const token = localStorage.getItem('access_token');
-    try { const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const t = data.data || data || []; unidadesManutencaoCache = t.filter(u => String(u.almoxarifado_id) === String(almoxId) && u.status === 'com_defeito'); renderizarListaManutencao(); } catch(e) { listaDiv.innerHTML = '<div style="color: #ef4444; padding: 24px;">Erro.</div>'; }
+    try { const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const t = data.data || data || []; unidadesManutencaoCache = t.filter(u => u.status === 'com_defeito' && (!almoxId || String(u.almoxarifado_id) === String(almoxId))); renderizarListaManutencao(); } catch(e) { listaDiv.innerHTML = '<div style="color: #ef4444; padding: 24px;">Erro.</div>'; }
 }
 function renderizarListaManutencao() {
     const listaDiv = document.getElementById('manut_lote_lista');
     const f = (document.getElementById('manut_lote_filtro').value || '').toLowerCase();
     const filtradas = unidadesManutencaoCache.filter(u => { if (!f) return true; return (u.tag||'').toLowerCase().includes(f) || (u.produto_nome||'').toLowerCase().includes(f) || (u.numero_serie||'').toLowerCase().includes(f); });
-    if (filtradas.length === 0) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Nenhuma unidade disponível.</div>'; atualizarContadorManutencao(); return; }
-    listaDiv.innerHTML = filtradas.map(u => `<label style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer;"><input type="checkbox" class="manut-lote-check" value="${u.id}" onchange="atualizarContadorManutencao()"><div style="flex: 1;"><div style="font-weight: 600; font-size: 14px;">${u.tag||'Sem TAG'}</div><div style="font-size: 12px; color: #6b7280;">${u.produto_nome||'—'} • Série: ${u.numero_serie||'—'}</div></div><span style="font-size: 11px; padding: 3px 8px; border-radius: 8px; background: #dcfce7; color: #166534;">disponivel</span></label>`).join('');
+    if (filtradas.length === 0) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Nenhuma unidade com defeito.</div>'; atualizarContadorManutencao(); return; }
+    listaDiv.innerHTML = filtradas.map(u => `<label style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer;"><input type="checkbox" class="manut-lote-check" value="${u.id}" onchange="atualizarContadorManutencao()"><div style="flex: 1;"><div style="font-weight: 600; font-size: 14px;">${u.tag||'Sem TAG'}</div><div style="font-size: 12px; color: #6b7280;">${u.produto_nome||'—'} • Série: ${u.numero_serie||'—'}</div></div><span style="font-size: 11px; padding: 3px 8px; border-radius: 8px; background: #fee2e2; color: #b91c1c;">com defeito</span></label>`).join('');
     atualizarContadorManutencao();
 }
 function filtrarUnidadesManutencaoLote() { renderizarListaManutencao(); }

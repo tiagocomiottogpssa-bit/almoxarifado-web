@@ -1413,6 +1413,33 @@ def atualizar_unidade(id):
     params = tuple(valores.values()) + (id,)
     try:
         with get_connection() as conn:
+            # Busca status atual para validar transição
+            atual = conn.execute('SELECT status FROM unidades WHERE id = ?', (id,)).fetchone()
+            if not atual:
+                return response(False, message='Unidade não encontrada.', status_code=404)
+
+            novo_status = valores.get('status')
+            if novo_status and novo_status != atual['status']:
+                # Bloqueia alteração manual em fluxo de manutenção
+                if atual['status'] in ('com_defeito', 'em_manutencao'):
+                    return response(
+                        False,
+                        message=f'Unidade em "{atual["status"]}" não pode ter status alterado manualmente. Use o fluxo de manutenção.',
+                        status_code=400
+                    )
+                # Valida transições manuais permitidas
+                transicoes_manuais = {
+                    'disponivel': {'emprestado', 'com_defeito', 'em_manutencao'},
+                    'emprestado': {'disponivel', 'com_defeito'},
+                }
+                permitidos = transicoes_manuais.get(atual['status'], set())
+                if novo_status not in permitidos:
+                    return response(
+                        False,
+                        message=f'Transição de status inválida: {atual["status"]} → {novo_status}.',
+                        status_code=400
+                    )
+
             cur = conn.execute(
                 f'UPDATE unidades SET {set_clause} WHERE id = ?', params
             )
@@ -2176,7 +2203,7 @@ def devolucao_rapida():
                 """, (unidade_id,))
                 novo_status = 'com_defeito' if com_defeito else 'disponivel'
                 conn.execute(
-                    "UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?",
+                    "UPDATE unidades SET status = ?, localizacao = NULL, almoxarifado_id = NULL WHERE id = ?",
                     (novo_status, unidade_id)
                 )
                 if com_defeito:
@@ -3303,7 +3330,7 @@ def devolver_emprestimo():
                 )
             novo_status = 'com_defeito' if com_defeito else 'disponivel'
             conn.execute(
-                'UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?',
+                'UPDATE unidades SET status = ?, localizacao = NULL, almoxarifado_id = NULL WHERE id = ?',
                 (novo_status, unidade_id)
             )
             # Se com defeito, registra na manutenção (aguardando_envio)
