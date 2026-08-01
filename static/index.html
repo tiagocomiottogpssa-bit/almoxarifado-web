@@ -4870,7 +4870,26 @@ async function confirmarTransferenciaUnidades() {
 
 // ===== MANUTENÇÃO EM LOTE =====
 let unidadesManutencaoCache = [];
-function abrirModalManutencaoLote() { document.getElementById('modal-manutencao-lote').style.display = 'flex'; carregarSelectManutencaoLote(); }
+let todasUnidadesManutencao = [];
+async function abrirModalManutencaoLote() {
+    document.getElementById('modal-manutencao-lote').style.display = 'flex';
+    carregarSelectManutencaoLote();
+    await carregarTodasUnidadesManutencao();  // carrega tudo UMA vez
+    carregarUnidadesManutencaoLote();          // aplica o filtro atual
+}
+
+async function carregarTodasUnidadesManutencao() {
+    const token = localStorage.getItem('access_token');
+    try {
+        const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } });
+        const data = await res.json();
+        const t = data.data || data || [];
+        todasUnidadesManutencao = t;  // guarda TODAS as unidades em cache
+    } catch(e) {
+        console.error('Erro ao carregar unidades:', e);
+    }
+}
+
 function fecharModalManutencaoLote() {
     document.getElementById('modal-manutencao-lote').style.display = 'none';
     document.getElementById('manut_lote_almoxarifado').value = '';
@@ -4886,12 +4905,13 @@ async function carregarSelectManutencaoLote() {
     const token = localStorage.getItem('access_token');
     try { const res = await fetch(`${API_BASE}/almoxarifados`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const a = data.data || data || []; const s = document.getElementById('manut_lote_almoxarifado'); s.innerHTML = '<option value="">Todos os almoxarifados</option>'; a.forEach(x => s.innerHTML += `<option value="${x.id}">${x.nome}</option>`); } catch(e) { console.error(e); }
 }
-async function carregarUnidadesManutencaoLote() {
+function carregarUnidadesManutencaoLote() {
     const almoxId = document.getElementById('manut_lote_almoxarifado').value;
     const listaDiv = document.getElementById('manut_lote_lista');
     unidadesManutencaoCache = [];
-    const token = localStorage.getItem('access_token');
-    try { const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const t = data.data || data || []; unidadesManutencaoCache = t.filter(u => u.status === 'com_defeito' && (!almoxId || String(u.almoxarifado_id) === String(almoxId))); renderizarListaManutencao(); } catch(e) { listaDiv.innerHTML = '<div style="color: #ef4444; padding: 24px;">Erro.</div>'; }
+    const t = todasUnidadesManutencao;  // usa o cache (sem fetch)
+    unidadesManutencaoCache = t.filter(u => u.status === 'com_defeito' && (!almoxId || String(u.almoxarifado_id) === String(almoxId)));
+    renderizarListaManutencao();
 }
 function renderizarListaManutencao() {
     const listaDiv = document.getElementById('manut_lote_lista');
