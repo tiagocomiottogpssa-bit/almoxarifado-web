@@ -1489,7 +1489,7 @@ def iniciar_manutencao_unidade(id):
 
             # Atualiza status da unidade
             conn.execute(
-                'UPDATE unidades SET status_manutencao = ?, updated_at = ? WHERE id = ?',
+                'UPDATE unidades SET status_manutencao = ?, localizacao = NULL, updated_at = ? WHERE id = ?',
                 ('em_manutencao', now_iso(), id)
             )
 
@@ -1766,13 +1766,16 @@ def transferir_unidades_lote():
 
             for uid in unidades_ids:
                 row = conn.execute(
-                    'SELECT tag, produto_id, almoxarifado_id FROM unidades WHERE id = ?', (uid,)
+                    'SELECT tag, produto_id, almoxarifado_id, status FROM unidades WHERE id = ?', (uid,)
                 ).fetchone()
                 if not row:
                     erros.append(f'Unidade ID {uid} não encontrada.')
                     continue
                 if row['almoxarifado_id'] == destino_id:
                     erros.append(f'Unidade TAG {row["tag"]} já está no destino.')
+                    continue
+                if row['status'] in ('emprestado', 'manutencao'):
+                    erros.append(f'Unidade TAG {row["tag"]} não pode ser transferida (status: {row["status"]}).')
                     continue
 
                 produto_id = row['produto_id']
@@ -1949,7 +1952,7 @@ def enviar_unidades_manutencao_lote():
 
                 # Atualiza status da unidade
                 conn.execute(
-                    'UPDATE unidades SET status_manutencao = ?, updated_at = ? WHERE id = ?',
+                    'UPDATE unidades SET status_manutencao = ?, localizacao = NULL, updated_at = ? WHERE id = ?',
                     ('em_manutencao', now_iso(), uid)
                 )
 
@@ -3198,8 +3201,10 @@ def criar_emprestimo():
                 (unidade_id, colaborador_id, data_emprestimo, observacao, tipo, now_iso())
             )
             conn.execute(
-                'UPDATE unidades SET status = ? WHERE id = ?',
-                ('emprestado', unidade_id)
+                '''UPDATE unidades SET status = 'emprestado',
+                localizacao = (SELECT nome FROM colaboradores WHERE id = ?)
+                WHERE id = ?''',
+                (colaborador_id, unidade_id)
             )
             conn.commit()
         return response(True, message='Empréstimo registrado com sucesso.')
@@ -3225,10 +3230,10 @@ def devolver_emprestimo():
                     'UPDATE emprestimos SET status = ?, data_devolucao = ? WHERE id = ?',
                     ('devolvido', now_iso(), emp['id'])
                 )
-            conn.execute(
-                'UPDATE unidades SET status = ? WHERE id = ?',
-                ('disponivel', unidade_id)
-            )
+                conn.execute(
+                    'UPDATE unidades SET status = ? , localizacao = NULL WHERE id = ?',
+                    ('disponivel', unidade_id)
+                )
             conn.commit()
         return response(True, message='Devolução registrada com sucesso.')
     except Exception as e:
@@ -3253,10 +3258,10 @@ def manutencao_emprestimo():
                     'UPDATE emprestimos SET status = ?, data_devolucao = ? WHERE id = ?',
                     ('manutencao', now_iso(), emp['id'])
                 )
-            conn.execute(
-                'UPDATE unidades SET status = ? WHERE id = ?',
-                ('manutencao', unidade_id)
-            )
+                conn.execute(
+                    'UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?',
+                    ('manutencao', unidade_id)
+                )
             conn.commit()
         return response(True, message='Unidade enviada para manutenção.')
     except Exception as e:
