@@ -1336,7 +1336,6 @@ def criar_unidade():
         'data_validade_calibracao': data.get('data_validade_calibracao'),
         'numero_certificado': data.get('numero_certificado'),
         'data_ultima_manutencao': data.get('data_ultima_manutencao'),
-        'status_manutencao': data.get('status_manutencao') or 'disponivel',
         'observacao': data.get('observacao'),
         'created_at': now_iso(),
         'updated_at': now_iso()
@@ -1407,7 +1406,6 @@ def atualizar_unidade(id):
         'data_validade_calibracao': data.get('data_validade_calibracao'),
         'numero_certificado': data.get('numero_certificado'),
         'data_ultima_manutencao': data.get('data_ultima_manutencao'),
-        'status_manutencao': data.get('status_manutencao') or 'disponivel',
         'observacao': data.get('observacao'),
         'updated_at': now_iso()
     }
@@ -1470,27 +1468,34 @@ def iniciar_manutencao_unidade(id):
     try:
         with get_connection() as conn:
             row = conn.execute(
-                'SELECT tag, produto_id, almoxarifado_id FROM unidades WHERE id = ?', (id,)
+                'SELECT tag, produto_id, almoxarifado_id, status FROM unidades WHERE id = ?', (id,)
             ).fetchone()
             if not row:
                 return response(False, message='Unidade não encontrada.', status_code=404)
+            if row['status'] not in ('disponivel', 'com_defeito'):
+                return response(False, message=f'Unidade TAG {row["tag"]} não pode ir para manutenção (status: {row["status"]}).', status_code=400)
 
             produto_id = row['produto_id']
             almoxarifado_origem_id = row['almoxarifado_id']
             tag = row['tag'] or 'sem tag'
 
-            # Insere registro de manutenção com almoxarifado de origem
+            # Se já existe registro aguardando_envio, atualiza para em_manutencao
             conn.execute(
-                '''INSERT INTO manutencoes_unidades
-                   (unidade_id, descricao, fornecedor, data_envio, status, almoxarifado_origem_id, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                (id, descricao, fornecedor, now_iso(), 'em_manutencao', almoxarifado_origem_id, now_iso())
+                '''UPDATE manutencoes_unidades
+                SET status = 'em_manutencao', fornecedor = ?, data_envio = ?
+                WHERE unidade_id = ? AND status = 'aguardando_envio' ''',
+                (fornecedor, now_iso(), id)
             )
 
-            # Atualiza status da unidade
+            # Caso contrário (manutenção preventiva), cria novo registro
             conn.execute(
-                'UPDATE unidades SET status_manutencao = ?, localizacao = NULL, updated_at = ? WHERE id = ?',
-                ('em_manutencao', now_iso(), id)
+                '''INSERT INTO manutencoes_unidades
+                (unidade_id, descricao, fornecedor, data_envio, status, almoxarifado_origem_id, created_at)
+                SELECT ?, ?, ?, ?, 'em_manutencao', ?, ?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM manutencoes_unidades WHERE unidade_id = ? AND status = 'em_manutencao'
+                )''',
+                (id, descricao, fornecedor, now_iso(), almoxarifado_origem_id, now_iso(), id)
             )
 
             # Decrementa estoque da origem
@@ -1519,6 +1524,7 @@ def iniciar_manutencao_unidade(id):
             if user:
                 registrar_log(user['id'], current_user, 'manutencao', 'unidades',
                               f'Enviou unidade "{tag}" (ID {id}) para manutenção')
+            conn.commit()
         return response(True, message='Unidade enviada para manutenção com sucesso.')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
@@ -1565,7 +1571,7 @@ def retornar_manutencao_unidade(id):
             # Atualiza unidade: status + almoxarifado de destino
             conn.execute(
                 '''UPDATE unidades
-                   SET status_manutencao = 'disponivel',
+                   SET status = 'disponivel',
                        almoxarifado_id = ?,
                        data_ultima_manutencao = ?, updated_at = ?
                    WHERE id = ?''',
@@ -1657,7 +1663,7 @@ def retornar_manutencao_lote():
                 # Atualiza unidade: status + almoxarifado destino
                 conn.execute(
                     '''UPDATE unidades
-                       SET status_manutencao = 'disponivel',
+                       SET status = 'disponivel',
                            almoxarifado_id = ?,
                            data_ultima_manutencao = ?, updated_at = ?
                        WHERE id = ?''',
@@ -1913,49 +1919,53 @@ def enviar_unidades_manutencao_lote():
     unidades_ids = data.get('unidades_ids', [])
     descricao = data.get('descricao')
     fornecedor = data.get('fornecedor')
-
     if not unidades_ids:
         return response(False, message='Selecione ao menos uma unidade.', status_code=400)
     if not descricao:
         return response(False, message='descricao é obrigatória.', status_code=400)
-
     try:
         with get_connection() as conn:
             enviadas = 0
             erros = []
             doc_manut = f"Manut. Lote {now_iso()[:19]}"
-
             for uid in unidades_ids:
                 row = conn.execute(
-                    'SELECT tag, produto_id, almoxarifado_id, status_manutencao FROM unidades WHERE id = ?', (uid,)
+                    'SELECT tag, produto_id, almoxarifado_id, status FROM unidades WHERE id = ?', (uid,)
                 ).fetchone()
                 if not row:
                     erros.append(f'Unidade ID {uid} não encontrada.')
                     continue
-                if row['status_manutencao'] == 'em_manutencao':
+                if row['status'] == 'em_manutencao':
                     erros.append(f'Unidade TAG {row["tag"]} já está em manutenção.')
                     continue
-
+                if row['status'] != 'com_defeito':
+                    erros.append(f'Unidade TAG {row["tag"]} precisa estar com defeito para envio à manutenção.')
+                    continue
                 produto_id = row['produto_id']
                 almoxarifado_origem_id = row['almoxarifado_id']
                 tag = row['tag'] or 'sem tag'
-
-                # Insere registro de manutenção
+                # Atualiza registro de manutenção aguardando_envio -> em_manutencao
+                conn.execute(
+                    '''UPDATE manutencoes_unidades
+                       SET status = 'em_manutencao', fornecedor = ?, data_envio = ?
+                       WHERE unidade_id = ? AND status = 'aguardando_envio'''',
+                    (fornecedor, now_iso(), uid)
+                )
+                # Se não havia registro (caso raro), cria
                 conn.execute(
                     '''INSERT INTO manutencoes_unidades
-                       (unidade_id, descricao, fornecedor, data_envio, status,
-                        almoxarifado_origem_id, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                    (uid, descricao, fornecedor, now_iso(), 'em_manutencao',
-                     almoxarifado_origem_id, now_iso())
+                       (unidade_id, descricao, fornecedor, data_envio, status, almoxarifado_origem_id, created_at)
+                       SELECT ?, ?, ?, ?, 'em_manutencao', ?, ?
+                       WHERE NOT EXISTS (
+                           SELECT 1 FROM manutencoes_unidades WHERE unidade_id = ? AND status = 'em_manutencao'
+                       )''',
+                    (uid, descricao, fornecedor, now_iso(), almoxarifado_origem_id, now_iso(), uid)
                 )
-
                 # Atualiza status da unidade
                 conn.execute(
-                    'UPDATE unidades SET status_manutencao = ?, localizacao = NULL, updated_at = ? WHERE id = ?',
+                    'UPDATE unidades SET status = ?, localizacao = NULL, updated_at = ? WHERE id = ?',
                     ('em_manutencao', now_iso(), uid)
                 )
-
                 # Decrementa estoque da origem
                 if almoxarifado_origem_id:
                     conn.execute(
@@ -1972,9 +1982,7 @@ def enviar_unidades_manutencao_lote():
                         VALUES (?, ?, 'saida', 1, 0, ?, ?)
                     ''', (produto_id, almoxarifado_origem_id, doc_manut,
                           f'Saída - Manutenção em lote - TAG {tag}'))
-
                 enviadas += 1
-
             conn.commit()
             current_user = get_jwt_identity()
             user = conn.execute(
@@ -1982,11 +1990,73 @@ def enviar_unidades_manutencao_lote():
             ).fetchone()
             if user:
                 registrar_log(user['id'], current_user, 'manutencao_lote', 'unidades',
-                              f'Enviou {enviadas} unidade(s) para manutenção em lote')
-
+                              f'Enviou {enviadas} unidade(s) para manutenção em lote')    
+            conn.commit()
             msg = f'{enviadas} unidade(s) enviada(s) para manutenção.'
             if erros:
-                msg += f' {len(erros)} erro(s): ' + '; '.join(erros)
+                msg += ' Erros: ' + '; '.join(erros)
+            return response(True, message=msg)
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/unidades/manutencao/preventiva', methods=['POST'])
+@jwt_required()
+def manutencao_preventiva():
+    data = request.get_json() or {}
+    unidades_ids = data.get('unidades_ids', [])
+    descricao = data.get('descricao')
+    fornecedor = data.get('fornecedor')
+    if not unidades_ids:
+        return response(False, message='Selecione ao menos uma unidade.', status_code=400)
+    if not descricao:
+        return response(False, message='descricao é obrigatória.', status_code=400)
+    try:
+        with get_connection() as conn:
+            enviadas = 0
+            erros = []
+            for uid in unidades_ids:
+                row = conn.execute(
+                    'SELECT tag, produto_id, almoxarifado_id, status FROM unidades WHERE id = ?', (uid,)
+                ).fetchone()
+                if not row:
+                    erros.append(f'Unidade ID {uid} não encontrada.')
+                    continue
+                if row['status'] != 'disponivel':
+                    erros.append(f'Unidade TAG {row["tag"]} precisa estar disponível para manutenção preventiva.')
+                    continue
+                produto_id = row['produto_id']
+                almoxarifado_origem_id = row['almoxarifado_id']
+                tag = row['tag'] or 'sem tag'
+                conn.execute(
+                    '''INSERT INTO manutencoes_unidades
+                       (unidade_id, descricao, fornecedor, data_envio, status, almoxarifado_origem_id, created_at)
+                       VALUES (?, ?, ?, ?, 'em_manutencao', ?, ?)''',
+                    (uid, descricao, fornecedor, now_iso(), almoxarifado_origem_id, now_iso())
+                )
+                conn.execute(
+                    'UPDATE unidades SET status = ?, localizacao = NULL, updated_at = ? WHERE id = ?',
+                    ('em_manutencao', now_iso(), uid)
+                )
+                if almoxarifado_origem_id:
+                    conn.execute(
+                        '''UPDATE estoque
+                           SET quantidade = quantidade - 1, updated_at = ?
+                           WHERE produto_id = ? AND almoxarifado_id = ?''',
+                        (now_iso(), produto_id, almoxarifado_origem_id)
+                    )
+                    # Movimentação de saída
+                    conn.execute('''
+                        INSERT INTO movimentacoes
+                            (produto_id, almoxarifado_id, tipo, quantidade, valor_unitario,
+                             documento, observacao)
+                        VALUES (?, ?, 'saida', 1, 0, 'Manutenção Preventiva', ?)
+                    ''', (produto_id, almoxarifado_origem_id,
+                          f'Saída - Manutenção preventiva - TAG {tag}'))
+                enviadas += 1
+            conn.commit()
+            msg = f'{enviadas} unidade(s) enviada(s) para manutenção preventiva.'
+            if erros:
+                msg += ' Erros: ' + '; '.join(erros)
             return response(True, message=msg)
     except Exception as e:
         return response(False, message=str(e), status_code=500)
@@ -2096,24 +2166,24 @@ def devolucao_rapida():
             for item in itens:
                 unidade_id = item.get('unidade_id')
                 produto_id = item.get('produto_id')
-                
+                com_defeito = item.get('com_defeito', False)
                 if not unidade_id:
                     continue
-                
-                # Atualiza empréstimo ativo para devolvido
                 conn.execute("""
                     UPDATE emprestimos 
                     SET status = 'devolvido', data_devolucao = NOW() - INTERVAL '3 hours'
                     WHERE unidade_id = ? AND status = 'ativo'
                 """, (unidade_id,))
-                
-                # Atualiza status da unidade para disponível
+                novo_status = 'com_defeito' if com_defeito else 'disponivel'
                 conn.execute(
-                    "UPDATE unidades SET status = 'disponivel', localizacao = NULL WHERE id = ?",
-                    (unidade_id,)
+                    "UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?",
+                    (novo_status, unidade_id)
                 )
-                
-                # Registra na movimentações como entrada
+                if com_defeito:
+                    conn.execute("""
+                        INSERT INTO manutencoes_unidades (unidade_id, descricao, status, created_at)
+                        VALUES (?, ?, 'aguardando_envio', NOW() - INTERVAL '3 hours')
+                    """, (unidade_id, item.get('observacao') or 'Devolvida com defeito'))
                 conn.execute("""
                     INSERT INTO movimentacoes (tipo, produto_id, equipamento_id, colaborador_id, almoxarifado_id, quantidade, observacao, natureza, data)
                     VALUES ('entrada', ?, ?, ?, ?, 1, 'Devolução rápida via movimentação rápida', 'emprestimo', NOW() - INTERVAL '3 hours')
@@ -3217,6 +3287,7 @@ def devolver_emprestimo():
     data = request.get_json() or {}
     unidade_id = data.get('unidade_id')
     observacao = data.get('observacao', '')
+    com_defeito = data.get('com_defeito', False)
     if not unidade_id:
         return response(False, message='Unidade é obrigatória.', status_code=400)
     try:
@@ -3230,40 +3301,21 @@ def devolver_emprestimo():
                     'UPDATE emprestimos SET status = ?, data_devolucao = ? WHERE id = ?',
                     ('devolvido', now_iso(), emp['id'])
                 )
+            novo_status = 'com_defeito' if com_defeito else 'disponivel'
+            conn.execute(
+                'UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?',
+                (novo_status, unidade_id)
+            )
+            # Se com defeito, registra na manutenção (aguardando_envio)
+            if com_defeito:
                 conn.execute(
-                    'UPDATE unidades SET status = ? , localizacao = NULL WHERE id = ?',
-                    ('disponivel', unidade_id)
+                    '''INSERT INTO manutencoes_unidades
+                       (unidade_id, descricao, status, created_at)
+                       VALUES (?, ?, 'aguardando_envio', ?)''',
+                    (unidade_id, observacao or 'Devolvida com defeito', now_iso())
                 )
             conn.commit()
         return response(True, message='Devolução registrada com sucesso.')
-    except Exception as e:
-        return response(False, message=str(e), status_code=500)
-
-@app.route('/emprestimos/manutencao', methods=['POST'])
-@jwt_required()
-def manutencao_emprestimo():
-    data = request.get_json() or {}
-    unidade_id = data.get('unidade_id')
-    observacao = data.get('observacao', '')
-    if not unidade_id:
-        return response(False, message='Unidade é obrigatória.', status_code=400)
-    try:
-        with get_connection() as conn:
-            emp = conn.execute(
-                'SELECT id FROM emprestimos WHERE unidade_id = ? AND status = ? ORDER BY id DESC LIMIT 1',
-                (unidade_id, 'ativo')
-            ).fetchone()
-            if emp:
-                conn.execute(
-                    'UPDATE emprestimos SET status = ?, data_devolucao = ? WHERE id = ?',
-                    ('manutencao', now_iso(), emp['id'])
-                )
-                conn.execute(
-                    'UPDATE unidades SET status = ?, localizacao = NULL WHERE id = ?',
-                    ('manutencao', unidade_id)
-                )
-            conn.commit()
-        return response(True, message='Unidade enviada para manutenção.')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
@@ -3386,7 +3438,7 @@ def dashboard():
                        (SELECT p.estoque_minimo FROM produtos p WHERE p.id = e.produto_id), 0)'''
             ).fetchone()['total']
             equip_manutencao = conn.execute(
-                "SELECT COUNT(*) as total FROM unidades WHERE status_manutencao = 'em_manutencao'"
+                "SELECT COUNT(*) as total FROM unidades WHERE status = 'em_manutencao'"
             ).fetchone()['total']
             calibracoes_vencer = conn.execute(
                 '''SELECT COUNT(*) as total FROM unidades
@@ -3417,7 +3469,7 @@ def dashboard():
                 '''SELECT u.id, u.tag, u.numero_serie, p.nome as produto_nome
                    FROM unidades u
                    LEFT JOIN produtos p ON u.produto_id = p.id
-                   WHERE u.status_manutencao = 'em_manutencao' '''
+                   WHERE u.status = 'em_manutencao' '''
             ).fetchall()
             calibracoes_lista = conn.execute(
                 '''SELECT u.id, u.tag, u.numero_serie, p.nome as produto_nome,

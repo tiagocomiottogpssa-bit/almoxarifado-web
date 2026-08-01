@@ -259,6 +259,13 @@ def init_db():
         _migrate_produtos_sobressalente(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)
+        # Migração: adiciona almoxarifado_origem_id se não existir
+        if not _column_exists(conn, 'manutencoes_unidades', 'almoxarifado_origem_id'):
+            conn.execute("ALTER TABLE manutencoes_unidades ADD COLUMN almoxarifado_origem_id INTEGER")
+        # Migração: atualiza CHECK de status da manutencoes_unidades para incluir aguardando_envio
+        if USE_POSTGRES:
+            conn.execute("ALTER TABLE manutencoes_unidades DROP CONSTRAINT IF EXISTS manutencoes_unidades_status_check")
+            conn.execute("ALTER TABLE manutencoes_unidades ADD CONSTRAINT manutencoes_unidades_status_check CHECK (status IN ('aguardando_envio', 'em_manutencao', 'concluida'))")    
         _migrate_unidades_depreciacao(conn)
         _migrate_produtos_depreciacao(conn)
         _migrate_produtos_sobressalente(conn) 
@@ -548,7 +555,8 @@ def _create_manutencoes_unidades(conn):
             custo REAL,
             data_envio TEXT,
             data_retorno TEXT,
-            status TEXT DEFAULT 'em_manutencao' CHECK(status IN ('em_manutencao', 'concluida')),
+            status TEXT DEFAULT 'em_manutencao' CHECK(status IN ('aguardando_envio', 'em_manutencao', 'concluida')),
+            almoxarifado_origem_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (unidade_id) REFERENCES unidades(id)
         )
