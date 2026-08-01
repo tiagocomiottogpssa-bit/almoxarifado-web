@@ -4890,7 +4890,6 @@ async function carregarUnidadesManutencaoLote() {
     const almoxId = document.getElementById('manut_lote_almoxarifado').value;
     const listaDiv = document.getElementById('manut_lote_lista');
     unidadesManutencaoCache = [];
-    if (!almoxId) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Selecione um almoxarifado.</div>'; atualizarContadorManutencao(); return; }
     const token = localStorage.getItem('access_token');
     try { const res = await fetch(`${API_BASE}/unidades`, { headers: { 'Authorization': `Bearer ${token}` } }); const data = await res.json(); const t = data.data || data || []; unidadesManutencaoCache = t.filter(u => u.status === 'com_defeito' && (!almoxId || String(u.almoxarifado_id) === String(almoxId))); renderizarListaManutencao(); } catch(e) { listaDiv.innerHTML = '<div style="color: #ef4444; padding: 24px;">Erro.</div>'; }
 }
@@ -5030,7 +5029,7 @@ window.addEventListener('load', init);
         <div class="form-group" style="margin-bottom: 16px;">
             <label>Almoxarifado</label>
             <select id="manut_lote_almoxarifado" onchange="carregarUnidadesManutencaoLote()">
-                <option value="">Selecione o almoxarifado</option>
+                <option value="">Todos os almoxarifados</option>
             </select>
         </div>
         <div style="display: flex; gap: 16px; margin-bottom: 16px;">
