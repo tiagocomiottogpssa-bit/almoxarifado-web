@@ -2456,6 +2456,8 @@ function limparFormUsuario() {
     document.getElementById('novo-confirmar-password').value = '';
     document.getElementById('novo-perfil').value = 'operador';
     document.querySelector('input[name="usuario_status"][value="ativo"]').checked = true;
+    const btn = document.querySelector('#usuarioForm .btn-primary');
+    if (btn) btn.textContent = 'Salvar Usuário';
 }
 
 function aplicarPermissoes(perfil) {
