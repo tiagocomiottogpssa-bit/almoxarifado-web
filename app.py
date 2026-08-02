@@ -3654,7 +3654,8 @@ def dashboard():
                 'movimentacoes_mensais': [dict(r) for r in movimentacoes_mensais],
                 'valor_por_almoxarifado': [dict(r) for r in valor_por_almoxarifado],
                 'status_unidades': [dict(r) for r in status_unidades],
-                'manutencoes_fornecedor': [dict(r) for r in manut_fornecedor]
+                'manutencoes_fornecedor': [dict(r) for r in manut_fornecedor],
+                'maiores_consumidores': [dict(r) for r in maiores_consumidores],
             }
         })
     except Exception as e:

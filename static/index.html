@@ -1998,11 +1998,27 @@ async function carregarDashboard() {
 }
 
 function renderizarGraficosDashboard(g) {
-    if (typeof Chart === 'undefined') return;  // CDN não carregou
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js não carregou. Verifique o CDN no <head>.');
+        return;
+    }
+    if (!g) return;
 
-    // Curva ABC (barras)
-    if (g.curva_abc && document.getElementById('chart-abc')) {
-        new Chart(document.getElementById('chart-abc'), {
+    // Registro de instâncias: destrói antes de recriar (evita "Canvas is already in use")
+    window.dashCharts = window.dashCharts || {};
+
+    function criarOuAtualizar(id, config) {
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+        if (window.dashCharts[id]) {
+            window.dashCharts[id].destroy();
+        }
+        window.dashCharts[id] = new Chart(canvas, config);
+    }
+
+    // 1. Curva ABC (barras)
+    if (g.curva_abc && g.curva_abc.length) {
+        criarOuAtualizar('chart-abc', {
             type: 'bar',
             data: {
                 labels: g.curva_abc.map(x => x.produto),
@@ -2012,9 +2028,9 @@ function renderizarGraficosDashboard(g) {
         });
     }
 
-    // Movimentações mensais (linha)
-    if (g.movimentacoes_mensais && document.getElementById('chart-movimentacoes')) {
-        new Chart(document.getElementById('chart-movimentacoes'), {
+    // 2. Movimentações mensais (linha)
+    if (g.movimentacoes_mensais && g.movimentacoes_mensais.length) {
+        criarOuAtualizar('chart-movimentacoes', {
             type: 'line',
             data: {
                 labels: g.movimentacoes_mensais.map(x => x.mes),
@@ -2027,22 +2043,21 @@ function renderizarGraficosDashboard(g) {
         });
     }
 
-    // Top consumidores (barras horizontais)
-    const consumidores = result.data.maiores_consumidores || [];
-    if (consumidores.length && document.getElementById('chart-consumidores')) {
-        new Chart(document.getElementById('chart-consumidores'), {
+    // 3. Top consumidores (barras horizontais) — CORRIGIDO: usa g.maiores_consumidores
+    if (g.maiores_consumidores && g.maiores_consumidores.length) {
+        criarOuAtualizar('chart-consumidores', {
             type: 'bar',
             data: {
-                labels: consumidores.map(x => x.nome || 'Sem colaborador'),
-                datasets: [{ label: 'Qtd. Retirada', data: consumidores.map(x => x.quantidade_total), backgroundColor: '#2563eb' }]
+                labels: g.maiores_consumidores.map(x => x.nome || 'Sem colaborador'),
+                datasets: [{ label: 'Qtd. Retirada', data: g.maiores_consumidores.map(x => x.quantidade_total), backgroundColor: '#2563eb' }]
             },
             options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
         });
     }
 
-    // Valor por almoxarifado (donut)
-    if (g.valor_por_almoxarifado && document.getElementById('chart-almoxarifado')) {
-        new Chart(document.getElementById('chart-almoxarifado'), {
+    // 4. Valor por almoxarifado (donut)
+    if (g.valor_por_almoxarifado && g.valor_por_almoxarifado.length) {
+        criarOuAtualizar('chart-almoxarifado', {
             type: 'doughnut',
             data: {
                 labels: g.valor_por_almoxarifado.map(x => x.almoxarifado),
@@ -2052,9 +2067,9 @@ function renderizarGraficosDashboard(g) {
         });
     }
 
-    // Status das unidades (donut)
-    if (g.status_unidades && document.getElementById('chart-status')) {
-        new Chart(document.getElementById('chart-status'), {
+    // 5. Status das unidades (donut)
+    if (g.status_unidades && g.status_unidades.length) {
+        criarOuAtualizar('chart-status', {
             type: 'doughnut',
             data: {
                 labels: g.status_unidades.map(x => x.status),
@@ -2064,9 +2079,9 @@ function renderizarGraficosDashboard(g) {
         });
     }
 
-    // Manutenções por fornecedor (barras)
-    if (g.manutencoes_fornecedor && document.getElementById('chart-manutencao')) {
-        new Chart(document.getElementById('chart-manutencao'), {
+    // 6. Manutenções por fornecedor (barras)
+    if (g.manutencoes_fornecedor && g.manutencoes_fornecedor.length) {
+        criarOuAtualizar('chart-manutencao', {
             type: 'bar',
             data: {
                 labels: g.manutencoes_fornecedor.map(x => x.fornecedor),
