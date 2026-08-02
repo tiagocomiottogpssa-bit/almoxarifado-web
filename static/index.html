@@ -673,15 +673,15 @@ th, td {
                     <div style="display: flex; gap: 16px;">
                         <div class="form-group" style="flex: 1;">
                             <label>Periodicidade (dias) <span style="color: #ef4444;">*</span></label>
-                            <input type="number" id="unidade_periodicidade_preventiva" min="1" placeholder="Ex: 90">
+                            <input type="number" id="unidade_periodicidade_preventiva" min="1" placeholder="Ex: 90" onchange="calcularProximaPreventiva()">
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label>Data última preventiva</label>
-                            <input type="date" id="unidade_data_ultima_preventiva">
+                            <input type="date" id="unidade_data_ultima_preventiva" onchange="calcularProximaPreventiva()">
                         </div>
                         <div class="form-group" style="flex: 1;">
                             <label>Data próxima preventiva</label>
-                            <input type="date" id="unidade_data_proxima_preventiva">
+                            <input type="date" id="unidade_data_proxima_preventiva" readonly style="background:#f3f4f6;cursor:not-allowed;">
                         </div>
                     </div>
                 </div>
@@ -4219,6 +4219,19 @@ function toggleCamposCalibracao() {
 function toggleCamposPreventiva() {
     const checked = document.getElementById('unidade_tem_preventiva').checked;
     document.getElementById('campos_preventiva').style.display = checked ? 'flex' : 'none';
+}
+
+function calcularProximaPreventiva() {
+    const periodicidade = parseInt(document.getElementById('unidade_periodicidade_preventiva').value);
+    const ultima = document.getElementById('unidade_data_ultima_preventiva').value;
+    const campoProx = document.getElementById('unidade_data_proxima_preventiva');
+    if (!periodicidade || !ultima) {
+        campoProx.value = '';
+        return;
+    }
+    const d = new Date(ultima + 'T00:00:00');
+    d.setDate(d.getDate() + periodicidade);
+    campoProx.value = d.toISOString().slice(0, 10);
 }
 
 function limparFormUnidade() {

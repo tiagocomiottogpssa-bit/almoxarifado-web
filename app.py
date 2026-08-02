@@ -1356,11 +1356,13 @@ def criar_unidade():
                 tuple(valores.values())
             )
 
-            # Cálculo da próxima preventiva (se periodicidade definida e sem data manual)
-            if valores.get('periodicidade_preventiva_dias') and not valores.get('data_proxima_preventiva'):
-                periodicidade = int(valores['periodicidade_preventiva_dias'])
-                base = valores.get('data_ultima_preventiva') or hoje_iso
-                valores['data_proxima_preventiva'] = (date.fromisoformat(base[:10]) + timedelta(days=periodicidade)).isoformat()
+            # Data da próxima preventiva é SEMPRE calculada (nunca manual)
+            if valores.get('periodicidade_preventiva_dias'):
+                    periodicidade = int(valores['periodicidade_preventiva_dias'])
+                    base = valores.get('data_ultima_preventiva') or hoje_iso
+                    valores['data_proxima_preventiva'] = (date.fromisoformat(base[:10]) + timedelta(days=periodicidade)).isoformat()
+            else:
+                    valores['data_proxima_preventiva'] = None
 
             # Incrementa +1 no estoque do produto vinculado
             almoxarifado_id = valores.get('almoxarifado_id')
