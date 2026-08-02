@@ -4564,12 +4564,12 @@ def _montar_relatorio_dinamico(dados):
     cfg = FONTES_RELATORIOS[fonte]
     campos_map = cfg['campos']
 
-    # ---- SELECT (campos simples) ----
+    # ---- SELECT (campos simples) com aliases únicos ----
     selects = []
     colunas = []
-    for c in campos:
+    for i, c in enumerate(campos):
         if c in campos_map:
-            selects.append(campos_map[c][0])
+            selects.append(f"{campos_map[c][0]} AS col_{i}")
             colunas.append(campos_map[c][1])
 
     # ---- Agregações ----
@@ -4587,19 +4587,21 @@ def _montar_relatorio_dinamico(dados):
             expr = 'COUNT(*)'
         else:
             expr = f'{fn}({col})'
-        aggr_sql.append(expr)
+        aggr_sql.append(f'{expr} AS agg_{len(aggr_sql)}')
         aggr_colunas.append(alias or f'{funcao}_{campo}')
 
     usar_agregacao = bool(aggr_sql)
 
     # ---- GROUP BY (campos de agrupamento) ----
-    grupo_validos = []
-    for g in grupo:
+    grupo_expr = []    # expressões originais (para GROUP BY)
+    grupo_select = []  # com alias único (para SELECT)
+    for i, g in enumerate(grupo):
         if g in campos_map:
-            grupo_validos.append(campos_map[g][0])
+            grupo_expr.append(campos_map[g][0])
+            grupo_select.append(f"{campos_map[g][0]} AS grp_{i}")
 
     if usar_agregacao:
-        select_parts = grupo_validos + aggr_sql
+        select_parts = grupo_select + aggr_sql
         select_sql = ', '.join(select_parts) if select_parts else '1'
         colunas_finais = []
         for g in grupo:
@@ -4649,8 +4651,8 @@ def _montar_relatorio_dinamico(dados):
 
     # ---- GROUP BY / ORDER BY / LIMIT ----
     group_sql = ''
-    if usar_agregacao and grupo_validos:
-        group_sql = ' GROUP BY ' + ', '.join(grupo_validos)
+    if usar_agregacao and grupo_expr:
+        group_sql = ' GROUP BY ' + ', '.join(grupo_expr)
 
     order_sql = ''
     if ordenar and ordenar in campos_map:
@@ -4668,7 +4670,14 @@ def _montar_relatorio_dinamico(dados):
     with get_connection() as conn:
         linhas = conn.execute(query, params).fetchall()
 
-    resultado = [list(r) for r in linhas]
+    # Converte linhas em listas de VALORES (compatível SQLite Row e PostgreSQL dict)
+    resultado = []
+    for r in linhas:
+        if isinstance(r, dict):
+            resultado.append(list(r.values()))
+        else:
+            resultado.append(list(r))
+
     return colunas_finais, resultado
 
 if __name__ == '__main__':
