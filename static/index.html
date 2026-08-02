@@ -2067,13 +2067,31 @@ function renderizarGraficosDashboard(g) {
         });
     }
 
-    // 5. Status das unidades (donut)
+        // 5. Status das unidades (donut) — cores mapeadas por status
     if (g.status_unidades && g.status_unidades.length) {
+        const coresStatus = {
+            'disponivel': '#22c55e',      // verde
+            'disponível': '#22c55e',
+            'emprestado': '#f97316',      // laranja
+            'com_defeito': '#dc2626',     // vermelho
+            'em_manutencao': '#2563eb',   // azul
+            'em_manutenção': '#2563eb',
+            'baixa': '#6b7280',           // cinza
+            'inativo': '#9ca3af',         // cinza claro
+        };
+        const paletaFallback = ['#059669','#2563eb','#7c3aed','#d97706','#dc2626','#0891b2','#6b7280'];
+        const cores = g.status_unidades.map((x, i) => {
+            const chave = String(x.status || '')
+                .toLowerCase()
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // remove acentos
+                .replace(/\s+/g, '_');                              // espaços → underscore
+            return coresStatus[chave] || paletaFallback[i % paletaFallback.length];
+        });
         criarOuAtualizar('chart-status', {
             type: 'doughnut',
             data: {
                 labels: g.status_unidades.map(x => x.status),
-                datasets: [{ data: g.status_unidades.map(x => x.total), backgroundColor: ['#27ae60','#2563eb','#dc2626','#d97706','#6b7280'] }]
+                datasets: [{ data: g.status_unidades.map(x => x.total), backgroundColor: cores }]
             },
             options: { responsive: true, maintainAspectRatio: false }
         });
