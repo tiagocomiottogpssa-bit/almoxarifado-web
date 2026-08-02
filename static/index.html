@@ -2340,14 +2340,7 @@ async function carregarEstoque() {
         const result = await res.json();
         const dados = Array.isArray(result) ? result : (result.data || []);
 
-        tbody.innerHTML = '';
-
-        if (!dados || dados.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:16px;">Nenhum item em estoque</td></tr>';
-            return;
-        }
-
-        // ✅ Guarda os dados para usar no editar
+        // ✅ Guarda os dados para usar no editar e nos filtros
         estoqueDadosCache = dados;
 
         // Atualiza os cards
@@ -2355,52 +2348,68 @@ async function carregarEstoque() {
             atualizarCardsEstoque(dados);
         }
 
-        dados.forEach((item, index) => {
-            const quantidade = parseFloat(item.quantidade) || 0;
-            const estoqueMinimo = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
-
-            let statusLabel = '', statusBg = '', statusCor = '';
-            if (quantidade === 0) {
-                statusLabel = 'SEM ESTOQUE'; statusBg = '#dc2626'; statusCor = '#fff';
-            } else if (quantidade <= (estoqueMinimo / 2)) {
-                statusLabel = 'CRÍTICO'; statusBg = '#fd7e14'; statusCor = '#fff';
-            } else if (quantidade <= estoqueMinimo) {
-                statusLabel = 'BAIXO'; statusBg = '#ffc107'; statusCor = '#333';
-            } else {
-                statusLabel = 'NORMAL'; statusBg = '#27ae60'; statusCor = '#fff';
-            }
-
-            const naoNormal = statusLabel !== 'NORMAL';
-
-            const possuiPedido = item.possui_pedido_aberto === 1 || item.possui_pedido_aberto === true;
-
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td style="text-align:center;width:40px;">
-                    ${naoNormal ? `<input type="checkbox" class="checkbox-item-estoque" data-index="${index}" onchange="atualizarBtnPedidoEstoque()">` : ''}
-                    ${possuiPedido ? '<span style="font-size:14px;cursor:default;margin-left:2px;" title="Este produto já possui pedido em aberto">📋</span>' : ''}
-                </td>
-                <td>${item.codigo_interno || '-'}</td>
-                <td>${item.produto_nome || '-'}</td>
-                <td>${item.categoria || '-'}</td>
-                <td>${item.almoxarifado_nome || '-'}</td>
-                <td style="font-weight:700;">${quantidade}</td>
-                <td>${estoqueMinimo}</td>
-                <td><span style="padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;color:${statusCor};background:${statusBg};">${statusLabel}</span></td>
-                <td style="text-align:right;">${formatarMoeda(item.custo_medio)}</td>
-                <td style="text-align:right;">${formatarMoeda(item.valor_patrimonial)}</td>
-                <td style="text-align:center;">
-                    <button onclick="editarEstoqueMinimo(${index})"
-                        style="padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer;font-size:12px;">
-                        ✏️ Editar
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        });
+        // Renderiza a tabela completa
+        renderizarLinhasEstoque(dados);
     } catch (err) {
         showMessage('estoque-message', 'Erro: ' + err.message, 'error');
     }
+}
+
+function renderizarLinhasEstoque(dados) {
+    const tbody = document.getElementById('tabela-estoque');
+    tbody.innerHTML = '';
+
+    if (!dados || dados.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:#999;padding:16px;">Nenhum item encontrado com os filtros aplicados.</td></tr>';
+        return;
+    }
+
+    dados.forEach((item) => {
+        const quantidade = parseFloat(item.quantidade) || 0;
+        const estoqueMinimo = parseFloat(item.estoque_minimo || item.produto_estoque_minimo) || 0;
+
+        let statusLabel = '', statusBg = '', statusCor = '';
+        if (quantidade === 0) {
+            statusLabel = 'SEM ESTOQUE'; statusBg = '#dc2626'; statusCor = '#fff';
+        } else if (quantidade <= (estoqueMinimo / 2)) {
+            statusLabel = 'CRÍTICO'; statusBg = '#fd7e14'; statusCor = '#fff';
+        } else if (quantidade <= estoqueMinimo) {
+            statusLabel = 'BAIXO'; statusBg = '#ffc107'; statusCor = '#333';
+        } else {
+            statusLabel = 'NORMAL'; statusBg = '#27ae60'; statusCor = '#fff';
+        }
+
+        const naoNormal = statusLabel !== 'NORMAL';
+
+        const possuiPedido = item.possui_pedido_aberto === 1 || item.possui_pedido_aberto === true;
+
+        // Índice real no cache original (para o editarEstoqueMinimo continuar funcionando)
+        const index = estoqueDadosCache.indexOf(item);
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="text-align:center;width:40px;">
+                ${naoNormal ? `<input type="checkbox" class="checkbox-item-estoque" data-index="${index}" onchange="atualizarBtnPedidoEstoque()">` : ''}
+                ${possuiPedido ? '<span style="font-size:14px;cursor:default;margin-left:2px;" title="Este produto já possui pedido em aberto">📋</span>' : ''}
+            </td>
+            <td>${item.codigo_interno || '-'}</td>
+            <td>${item.produto_nome || '-'}</td>
+            <td>${item.categoria || '-'}</td>
+            <td>${item.almoxarifado_nome || '-'}</td>
+            <td style="font-weight:700;">${quantidade}</td>
+            <td>${estoqueMinimo}</td>
+            <td><span style="padding:4px 10px;border-radius:12px;font-size:12px;font-weight:600;color:${statusCor};background:${statusBg};">${statusLabel}</span></td>
+            <td style="text-align:right;">${formatarMoeda(item.custo_medio)}</td>
+            <td style="text-align:right;">${formatarMoeda(item.valor_patrimonial)}</td>
+            <td style="text-align:center;">
+                <button onclick="editarEstoqueMinimo(${index})"
+                    style="padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#374151;cursor:pointer;font-size:12px;">
+                    ✏️ Editar
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
 }
 
 function obterStatusEstoque(quantidade, estoqueMinimo) {
@@ -2502,17 +2511,6 @@ function atualizarCardsEstoque(dados) {
     // Card cinza 🔴 → Sem estoque
     const cardZerado = document.getElementById('estoque-card-zerado');
     if (cardZerado) cardZerado.textContent = zerado;
-}
-
-function aplicarFiltrosEstoque() {
-    carregarEstoque();
-}
-
-function limparFiltrosEstoque() {
-    document.getElementById('estoque_filtro').value = '';
-    document.getElementById('estoque_filtro_almoxarifado').value = '';
-    document.getElementById('estoque_filtro_status').value = '';
-    carregarEstoque();
 }
 
 async function editarEstoqueMinimo(index) {
@@ -2680,14 +2678,41 @@ function loadAlmoxarifadosSelect() {
 }
 
 function aplicarFiltrosEstoque() {
-    carregarEstoque();
+    const busca = (document.getElementById('estoque_filtro').value || '').toLowerCase().trim();
+    const almoxId = document.getElementById('estoque_filtro_almoxarifado').value;
+    const statusFiltro = document.getElementById('estoque_filtro_status').value;
+
+    let dados = estoqueDadosCache || [];
+
+    // Filtro por texto (nome, código interno ou categoria)
+    if (busca) {
+        dados = dados.filter(i =>
+            (i.produto_nome || '').toLowerCase().includes(busca) ||
+            (i.codigo_interno || '').toLowerCase().includes(busca) ||
+            (i.categoria || '').toLowerCase().includes(busca)
+        );
+    }
+
+    // Filtro por almoxarifado
+    if (almoxId) {
+        dados = dados.filter(i => String(i.almoxarifado_id) === String(almoxId));
+    }
+
+    // Filtro por status de estoque (normal/baixo/critico/zerado)
+    if (statusFiltro) {
+        dados = dados.filter(i =>
+            obterStatusEstoque(i.quantidade, i.estoque_minimo || i.produto_estoque_minimo) === statusFiltro
+        );
+    }
+
+    renderizarLinhasEstoque(dados);
 }
 
 function limparFiltrosEstoque() {
     document.getElementById('estoque_filtro').value = '';
     document.getElementById('estoque_filtro_almoxarifado').value = '';
     document.getElementById('estoque_filtro_status').value = '';
-    carregarEstoque();
+    renderizarLinhasEstoque(estoqueDadosCache || []);
 }
 
 function exportarEstoque() {
