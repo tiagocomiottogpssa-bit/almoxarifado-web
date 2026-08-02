@@ -186,10 +186,11 @@ def _copy_common_columns(conn, source, dest, columns):
 # ============================================================
 
 def _migrate_colaboradores_codigo_barras(conn):
-    """Adiciona coluna codigo_barras na tabela colaboradores para leitura via scanner."""
+    """Adiciona coluna codigo_barras em colaboradores.
+    SQLite não suporta UNIQUE via ALTER TABLE — cria a coluna e um índice único separado."""
     if not _column_exists(conn, 'colaboradores', 'codigo_barras'):
-        conn.execute("ALTER TABLE colaboradores ADD COLUMN codigo_barras TEXT UNIQUE")
-        print("Migração: coluna 'codigo_barras' adicionada à tabela colaboradores.")
+        conn.execute("ALTER TABLE colaboradores ADD COLUMN codigo_barras TEXT")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_colaboradores_codigo_barras ON colaboradores(codigo_barras)")
     conn.commit()
 
 def _migrate_produtos_natureza(conn):

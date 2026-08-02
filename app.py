@@ -123,19 +123,18 @@ def calcular_custo_medio(conn, produto_id, quantidade_entrada, valor_unitario):
 @jwt_required()
 @perfil_required('admin')
 def registro():
-    data = request.get_json() or {}
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
-    perfil = data.get('perfil', 'operador')
-
-    if not username or not password:
-        return response(False, message='Username e password são obrigatórios.', status_code=400)
-
-        PERFIS_VALIDOS = ('admin', 'supervisor', 'operador', 'comprador', 'visualizador')
-    if perfil not in PERFIS_VALIDOS:
-        return response(False, message='Perfil inválido. Use admin, supervisor, operador, comprador ou visualizador.', status_code=400)
-
     try:
+        data = request.get_json() or {}
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        perfil = data.get('perfil', 'operador')
+
+        if not username or not password:
+            return response(False, message='Username e password são obrigatórios.', status_code=400)
+
+        if perfil not in PERFIS_VALIDOS:
+            return response(False, message='Perfil inválido. Use admin, supervisor, operador, comprador ou visualizador.', status_code=400)
+
         with get_connection() as conn:
             cur = conn.execute('SELECT id FROM usuarios WHERE username = ?', (username,))
             if cur.fetchone():
