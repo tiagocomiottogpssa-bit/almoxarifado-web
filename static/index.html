@@ -642,6 +642,26 @@ th, td {
                     </div>
                 </div>
 
+                <!-- Linha 4: Calibração -->
+                <div class="form-group" style="margin-top: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="unidade_requer_calibracao" onchange="toggleCamposCalibracao()" style="width: 16px; height: 16px;">
+                        <span style="font-size: 13px; font-weight: 600; color: #374151;">Requer calibração</span>
+                    </label>
+                </div>
+                <div id="campos_calibracao" style="display: none; margin-top: 12px;">
+                    <div style="display: flex; gap: 16px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Validade do Certificado <span style="color: #ef4444;">*</span></label>
+                            <input type="date" id="unidade_data_validade_calibracao">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Nº do Certificado</label>
+                            <input type="text" id="unidade_numero_certificado" placeholder="Ex: CERT-2026-001">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Linha 3: Localização -->
                 <div class="form-group" style="margin-top: 12px;">
                     <label>Localização</label>
@@ -2078,6 +2098,7 @@ function renderizarGraficosDashboard(g) {
             'em_manutenção': '#2563eb',
             'baixa': '#6b7280',           // cinza
             'inativo': '#9ca3af',         // cinza claro
+            'manutencao': '#2563eb',      // azul (mesmo do em_manutencao)
         };
         const paletaFallback = ['#059669','#2563eb','#7c3aed','#d97706','#dc2626','#0891b2','#6b7280'];
         const cores = g.status_unidades.map((x, i) => {
@@ -4073,9 +4094,33 @@ function salvarUnidade() {
         return;
     }
 
-    const token = localStorage.getItem('access_token');
+        const token = localStorage.getItem('access_token');
     const localizacao = document.getElementById('unidade_localizacao').value.trim();
-    const body = { produto_id: parseInt(produto_id), tag, numero_serie, status, localizacao };
+    const requer_calibracao = document.getElementById('unidade_requer_calibracao').checked;
+    const data_validade_calibracao = document.getElementById('unidade_data_validade_calibracao').value;
+    const numero_certificado = document.getElementById('unidade_numero_certificado').value.trim();
+    if (requer_calibracao && !data_validade_calibracao) {
+        alert('Informe a validade do certificado de calibração.');
+        return;
+    }
+    if (requer_calibracao && data_validade_calibracao) {
+        const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+        const val = new Date(data_validade_calibracao + 'T00:00:00');
+        if (val < hoje) {
+            alert('A validade do certificado não pode estar no passado.');
+            return;
+        }
+    }
+    const body = {
+        produto_id: parseInt(produto_id),
+        tag,
+        numero_serie,
+        status,
+        localizacao,
+        requer_calibracao,
+        data_validade_calibracao: data_validade_calibracao || null,
+        numero_certificado: numero_certificado || null
+    };
 
     const url = id
         ? `${API_BASE}/unidades/${id}`
@@ -4105,6 +4150,11 @@ function salvarUnidade() {
     .catch(err => alert('Erro ao salvar unidade: ' + err.message));
 }
 
+function toggleCamposCalibracao() {
+    const checked = document.getElementById('unidade_requer_calibracao').checked;
+    document.getElementById('campos_calibracao').style.display = checked ? 'flex' : 'none';
+}
+
 function limparFormUnidade() {
     document.getElementById('unidadeId').value = '';
     document.getElementById('unidade_tag').value = '';
@@ -4112,6 +4162,10 @@ function limparFormUnidade() {
     document.getElementById('unidade_localizacao').value = '';
     document.getElementById('unidade_produto_id').value = '';
     document.querySelector('input[name="unidade_status"][value="disponivel"]').checked = true;
+    document.getElementById('unidade_requer_calibracao').checked = false;
+    document.getElementById('unidade_data_validade_calibracao').value = '';
+    document.getElementById('unidade_numero_certificado').value = '';
+    toggleCamposCalibracao();
 }
 
 function editarUnidade(id) {
@@ -4130,6 +4184,10 @@ function editarUnidade(id) {
         document.getElementById('unidade_tag').value = unidade.tag || '';
         document.getElementById('unidade_serie').value = unidade.numero_serie || '';
         document.getElementById('unidade_localizacao').value = unidade.localizacao || '';
+        document.getElementById('unidade_requer_calibracao').checked = !!unidade.requer_calibracao;
+        document.getElementById('unidade_data_validade_calibracao').value = unidade.data_validade_calibracao || '';
+        document.getElementById('unidade_numero_certificado').value = unidade.numero_certificado || '';
+        toggleCamposCalibracao();
 
         const radio = document.querySelector(`input[name="unidade_status"][value="${unidade.status}"]`);
         if (radio) radio.checked = true;
