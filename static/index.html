@@ -154,6 +154,7 @@ th, td {
 .modal { background: #fff; border-radius: 12px; padding: 28px; width: 90%; max-width: 500px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
 
 </style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 
@@ -517,6 +518,64 @@ th, td {
         </table>
         </div>
     </div>
+
+<!-- CONSTRUTOR DE RELATÓRIO -->
+<div style="margin-top:24px;border:1px solid #e5e7eb;border-radius:12px;padding:20px;background:#fff;">
+    <h3 style="margin:0 0 16px;font-size:18px;color:#1f2937;font-weight:700;">🛠️ CONSTRUTOR DE RELATÓRIO</h3>
+
+    <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;color:#374151;">1. Fonte de dados</label>
+        <select id="rel_fonte" onchange="atualizarCamposRelatorio()" style="width:100%;margin-top:6px;padding:8px;border:1px solid #d1d5db;border-radius:6px;">
+            <option value="movimentacoes">Movimentações</option>
+            <option value="estoque">Estoque</option>
+            <option value="unidades">Unidades</option>
+            <option value="manutencoes">Manutenções</option>
+            <option value="emprestimos">Empréstimos</option>
+        </select>
+    </div>
+
+    <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;color:#374151;">2. Campos (colunas do relatório)</label>
+        <div id="rel_campos" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+        <label style="font-size:13px;font-weight:600;color:#374151;">3. Filtros</label>
+        <div id="rel_filtros" style="margin-top:8px;"></div>
+        <button type="button" class="btn-secondary" style="margin-top:8px;font-size:12px;" onclick="adicionarFiltroRelatorio()">➕ Adicionar filtro</button>
+    </div>
+
+    <div style="margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;">4a. Agrupar por</label>
+            <select id="rel_grupo" multiple style="width:100%;margin-top:6px;padding:8px;border:1px solid #d1d5db;border-radius:6px;min-height:80px;"></select>
+            <div style="font-size:11px;color:#9ca3af;margin-top:4px;">Segure Ctrl para selecionar vários</div>
+        </div>
+        <div>
+            <label style="font-size:13px;font-weight:600;color:#374151;">4b. Agregações</label>
+            <div id="rel_agregacoes" style="margin-top:6px;"></div>
+            <button type="button" class="btn-secondary" style="margin-top:8px;font-size:12px;" onclick="adicionarAgregacaoRelatorio()">➕ Adicionar agregação</button>
+        </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn-primary" onclick="gerarRelatorioDinamico()">▶ Gerar Relatório</button>
+        <button type="button" class="btn-secondary" onclick="exportarRelatorioCSV()">📥 Exportar CSV</button>
+        <button type="button" class="btn-secondary" onclick="exportarRelatorioExcel()">📊 Exportar Excel</button>
+    </div>
+</div>
+
+<!-- Resultado -->
+<div id="rel_resultado_container" style="margin-top:20px;display:none;">
+    <h3 style="margin:0 0 12px;font-size:16px;color:#1f2937;font-weight:700;">Resultado <span id="rel_resultado_total" style="font-size:13px;color:#6b7280;font-weight:400;"></span></h3>
+    <div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead id="rel_resultado_thead"></thead>
+            <tbody id="rel_resultado_tbody"></tbody>
+        </table>
+    </div>
+</div>
+
 </div>  
 
             <!-- Ferramentas -->
@@ -984,6 +1043,49 @@ th, td {
                 <div style="font-size: 28px; font-weight: 700; color: #991b1b; margin-top: 8px;" id="dash-card-calibracoes">0</div>
                 <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Próximos 30 dias</div>
             </div>
+            <div class="dash-card" style="background: linear-gradient(135deg,#059669,#047857);">
+                <div style="font-size:13px;color:#d1fae5;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Valor Total Estoque</div>
+                <div style="font-size:26px;font-weight:700;color:#fff;margin-top:8px;" id="dash-card-valor-estoque">R$ 0</div>
+                <div style="font-size:12px;color:#a7f3d0;margin-top:4px;">Todos os produtos</div>
+            </div>
+            <div class="dash-card" style="background: linear-gradient(135deg,#2563eb,#1d4ed8);">
+                <div style="font-size:13px;color:#dbeafe;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Giro / Cobertura</div>
+                <div style="font-size:26px;font-weight:700;color:#fff;margin-top:8px;" id="dash-card-giro">0</div>
+                <div style="font-size:12px;color:#bfdbfe;margin-top:4px;" id="dash-card-cobertura">Cobertura: 0 dias</div>
+            </div>
+            <div class="dash-card" style="background: linear-gradient(135deg,#7c3aed,#6d28d9);">
+                <div style="font-size:13px;color:#ede9fe;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Unidades Emprestadas</div>
+                <div style="font-size:26px;font-weight:700;color:#fff;margin-top:8px;" id="dash-card-emprestadas">0</div>
+                <div style="font-size:12px;color:#ddd6fe;margin-top:4px;" id="dash-card-taxa-utilizacao">Taxa de utilização: 0%</div>
+            </div>
+        </div>
+
+            <!-- GRÁFICOS DO DASHBOARD -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;">
+    <div class="dash-card" style="padding:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:8px;">📊 Curva ABC de Consumo</div>
+        <canvas id="chart-abc" style="max-height:260px;"></canvas>
+    </div>
+    <div class="dash-card" style="padding:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:8px;">📈 Movimentações Mensais</div>
+        <canvas id="chart-movimentacoes" style="max-height:260px;"></canvas>
+    </div>
+    <div class="dash-card" style="padding:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:8px;">👤 Top Consumidores</div>
+        <canvas id="chart-consumidores" style="max-height:260px;"></canvas>
+    </div>
+    <div class="dash-card" style="padding:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:8px;">🏢 Valor por Almoxarifado</div>
+        <canvas id="chart-almoxarifado" style="max-height:260px;"></canvas>
+    </div>
+    <div class="dash-card" style="padding:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:8px;">🔧 Status das Unidades</div>
+        <canvas id="chart-status" style="max-height:260px;"></canvas>
+    </div>
+    <div class="dash-card" style="padding:16px;">
+        <div style="font-size:14px;font-weight:700;color:#1f2937;margin-bottom:8px;">🛠️ Manutenções por Fornecedor</div>
+        <canvas id="chart-manutencao" style="max-height:260px;"></canvas>
+    </div>
         </div>
 
         <!-- Grid de Indicadores -->
@@ -1785,6 +1887,27 @@ async function carregarDashboard() {
         });
         document.getElementById('dash-card-calibracoes').textContent = calibVencer.length;
 
+        // ===== NOVOS KPIs e GRÁFICOS =====
+        const kpis = result.data.kpis_novos || {};
+        const graficos = result.data.graficos || {};
+
+        // Cards novos
+        const elValor = document.getElementById('dash-card-valor-estoque');
+        if (elValor) elValor.textContent = formatarMoeda(kpis.valor_total_estoque || 0);
+        const elGiro = document.getElementById('dash-card-giro');
+        if (elGiro) elGiro.textContent = (kpis.giro_estoque || 0) + 'x';
+        const elCobertura = document.getElementById('dash-card-cobertura');
+        if (elCobertura) elCobertura.textContent = 'Cobertura: ' + (kpis.cobertura_dias || 0) + ' dias';
+        const elEmprestadas = document.getElementById('dash-card-emprestadas');
+        if (elEmprestadas) elEmprestadas.textContent = kpis.unidades_emprestadas || 0;
+        const elTaxa = document.getElementById('dash-card-taxa-utilizacao');
+        if (elTaxa) elTaxa.textContent = 'Taxa de utilização: ' + (kpis.taxa_utilizacao || 0) + '%';
+
+        // Gráficos (em try/catch para não quebrar se o CDN falhar)
+        try {
+            renderizarGraficosDashboard(graficos);
+        } catch(e) { console.error('Erro nos gráficos:', e); }
+
         // ===== TABELA: Maiores Consumidores (por colaborador) =====
         const saidas = movFiltradas.filter(m => m.tipo === 'saida');
         const consumoColab = {};
@@ -1870,6 +1993,86 @@ async function carregarDashboard() {
 
     } catch (err) {
         console.error('Erro ao carregar dashboard:', err);
+    }
+}
+
+function renderizarGraficosDashboard(g) {
+    if (typeof Chart === 'undefined') return;  // CDN não carregou
+
+    // Curva ABC (barras)
+    if (g.curva_abc && document.getElementById('chart-abc')) {
+        new Chart(document.getElementById('chart-abc'), {
+            type: 'bar',
+            data: {
+                labels: g.curva_abc.map(x => x.produto),
+                datasets: [{ label: 'Saídas', data: g.curva_abc.map(x => x.saidas), backgroundColor: '#059669' }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    // Movimentações mensais (linha)
+    if (g.movimentacoes_mensais && document.getElementById('chart-movimentacoes')) {
+        new Chart(document.getElementById('chart-movimentacoes'), {
+            type: 'line',
+            data: {
+                labels: g.movimentacoes_mensais.map(x => x.mes),
+                datasets: [
+                    { label: 'Entradas', data: g.movimentacoes_mensais.map(x => x.entradas), borderColor: '#059669', fill: false },
+                    { label: 'Saídas', data: g.movimentacoes_mensais.map(x => x.saidas), borderColor: '#dc2626', fill: false }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // Top consumidores (barras horizontais)
+    const consumidores = result.data.maiores_consumidores || [];
+    if (consumidores.length && document.getElementById('chart-consumidores')) {
+        new Chart(document.getElementById('chart-consumidores'), {
+            type: 'bar',
+            data: {
+                labels: consumidores.map(x => x.nome || 'Sem colaborador'),
+                datasets: [{ label: 'Qtd. Retirada', data: consumidores.map(x => x.quantidade_total), backgroundColor: '#2563eb' }]
+            },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+    }
+
+    // Valor por almoxarifado (donut)
+    if (g.valor_por_almoxarifado && document.getElementById('chart-almoxarifado')) {
+        new Chart(document.getElementById('chart-almoxarifado'), {
+            type: 'doughnut',
+            data: {
+                labels: g.valor_por_almoxarifado.map(x => x.almoxarifado),
+                datasets: [{ data: g.valor_por_almoxarifado.map(x => x.valor), backgroundColor: ['#059669','#2563eb','#7c3aed','#d97706','#dc2626','#0891b2'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // Status das unidades (donut)
+    if (g.status_unidades && document.getElementById('chart-status')) {
+        new Chart(document.getElementById('chart-status'), {
+            type: 'doughnut',
+            data: {
+                labels: g.status_unidades.map(x => x.status),
+                datasets: [{ data: g.status_unidades.map(x => x.total), backgroundColor: ['#27ae60','#2563eb','#dc2626','#d97706','#6b7280'] }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+
+    // Manutenções por fornecedor (barras)
+    if (g.manutencoes_fornecedor && document.getElementById('chart-manutencao')) {
+        new Chart(document.getElementById('chart-manutencao'), {
+            type: 'bar',
+            data: {
+                labels: g.manutencoes_fornecedor.map(x => x.fornecedor),
+                datasets: [{ label: 'Qtd. Manutenções', data: g.manutencoes_fornecedor.map(x => x.total), backgroundColor: '#d97706' }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
     }
 }
 
@@ -5926,6 +6129,328 @@ function imprimirUnidadesSelecionadas() {
     const ids = selecionados.join(',');
     window.open(`/unidades/etiquetas/lote?ids=${ids}&token=${token}`, '_blank');
 }
+
+// ===== CONSTRUTOR DE RELATÓRIO DINÂMICO =====
+const CAMPOS_RELATORIOS = {
+    movimentacoes: [
+        { id: 'data', label: 'Data', tipo: 'data' },
+        { id: 'tipo', label: 'Tipo', tipo: 'texto' },
+        { id: 'produto', label: 'Produto', tipo: 'texto' },
+        { id: 'categoria', label: 'Categoria', tipo: 'texto' },
+        { id: 'almoxarifado', label: 'Almoxarifado', tipo: 'texto' },
+        { id: 'colaborador', label: 'Colaborador', tipo: 'texto' },
+        { id: 'quantidade', label: 'Quantidade', tipo: 'numero' },
+        { id: 'valor_unitario', label: 'Valor Unitário', tipo: 'numero' },
+        { id: 'documento', label: 'Documento', tipo: 'texto' },
+        { id: 'tecnico', label: 'Técnico', tipo: 'texto' },
+        { id: 'ordem_servico', label: 'Ordem de Serviço', tipo: 'texto' }
+    ],
+    estoque: [
+        { id: 'produto', label: 'Produto', tipo: 'texto' },
+        { id: 'categoria', label: 'Categoria', tipo: 'texto' },
+        { id: 'almoxarifado', label: 'Almoxarifado', tipo: 'texto' },
+        { id: 'quantidade', label: 'Quantidade', tipo: 'numero' },
+        { id: 'estoque_minimo', label: 'Estoque Mínimo', tipo: 'numero' },
+        { id: 'custo_medio', label: 'Custo Médio', tipo: 'numero' },
+        { id: 'valor_patrimonial', label: 'Valor Patrimonial', tipo: 'numero' }
+    ],
+    unidades: [
+        { id: 'tag', label: 'Tag', tipo: 'texto' },
+        { id: 'numero_serie', label: 'Nº Série', tipo: 'texto' },
+        { id: 'produto', label: 'Produto', tipo: 'texto' },
+        { id: 'status', label: 'Status', tipo: 'texto' },
+        { id: 'almoxarifado', label: 'Almoxarifado', tipo: 'texto' },
+        { id: 'localizacao', label: 'Localização', tipo: 'texto' },
+        { id: 'requer_calibracao', label: 'Requer Calibração', tipo: 'texto' },
+        { id: 'data_validade_calibracao', label: 'Validade Calibração', tipo: 'data' },
+        { id: 'valor_aquisicao', label: 'Valor Aquisição', tipo: 'numero' },
+        { id: 'vida_util_meses', label: 'Vida Útil (meses)', tipo: 'numero' }
+    ],
+    manutencoes: [
+        { id: 'tag', label: 'Tag', tipo: 'texto' },
+        { id: 'produto', label: 'Produto', tipo: 'texto' },
+        { id: 'fornecedor', label: 'Fornecedor', tipo: 'texto' },
+        { id: 'status', label: 'Status', tipo: 'texto' },
+        { id: 'descricao', label: 'Descrição', tipo: 'texto' },
+        { id: 'custo', label: 'Custo', tipo: 'numero' },
+        { id: 'data_envio', label: 'Data Envio', tipo: 'data' },
+        { id: 'data_retorno', label: 'Data Retorno', tipo: 'data' },
+        { id: 'almoxarifado_origem', label: 'Almox. Origem', tipo: 'texto' }
+    ],
+    emprestimos: [
+        { id: 'tag', label: 'Tag', tipo: 'texto' },
+        { id: 'produto', label: 'Produto', tipo: 'texto' },
+        { id: 'colaborador', label: 'Colaborador', tipo: 'texto' },
+        { id: 'data_emprestimo', label: 'Data Empréstimo', tipo: 'data' },
+        { id: 'data_devolucao', label: 'Data Devolução', tipo: 'data' },
+        { id: 'status', label: 'Status', tipo: 'texto' },
+        { id: 'tipo', label: 'Tipo', tipo: 'texto' }
+    ]
+};
+
+let relatorioConfigAtual = null;  // guarda a última config gerada (para exportar)
+
+function atualizarCamposRelatorio() {
+    const fonte = document.getElementById('rel_fonte').value;
+    const campos = CAMPOS_RELATORIOS[fonte] || [];
+
+    // Checkboxes de campos
+    const divCampos = document.getElementById('rel_campos');
+    divCampos.innerHTML = '';
+    campos.forEach(c => {
+        const label = document.createElement('label');
+        label.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;font-size:12px;cursor:pointer;';
+        label.innerHTML = `<input type="checkbox" class="rel-campo-check" value="${c.id}" checked> ${c.label}`;
+        divCampos.appendChild(label);
+    });
+
+    // Select de agrupamento
+    const selectGrupo = document.getElementById('rel_grupo');
+    selectGrupo.innerHTML = '';
+    campos.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label;
+        selectGrupo.appendChild(opt);
+    });
+
+    // Limpa filtros e agregações
+    document.getElementById('rel_filtros').innerHTML = '';
+    document.getElementById('rel_agregacoes').innerHTML = '';
+    document.getElementById('rel_resultado_container').style.display = 'none';
+}
+
+function adicionarFiltroRelatorio() {
+    const fonte = document.getElementById('rel_fonte').value;
+    const campos = CAMPOS_RELATORIOS[fonte] || [];
+    const div = document.getElementById('rel_filtros');
+
+    const linha = document.createElement('div');
+    linha.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;';
+
+    const selectCampo = document.createElement('select');
+    selectCampo.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;';
+    campos.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label;
+        selectCampo.appendChild(opt);
+    });
+    selectCampo.onchange = () => atualizarOperadoresFiltro(linha, selectCampo.value);
+
+    const selectOp = document.createElement('select');
+    selectOp.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;';
+
+    const inputValor = document.createElement('input');
+    inputValor.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:120px;';
+    inputValor.placeholder = 'Valor';
+
+    const inputValor2 = document.createElement('input');
+    inputValor2.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:120px;display:none;';
+    inputValor2.placeholder = 'Até';
+
+    const btnRemover = document.createElement('button');
+    btnRemover.textContent = '✖';
+    btnRemover.style.cssText = 'padding:4px 8px;border:1px solid #fecaca;border-radius:6px;background:#fef2f2;color:#dc2626;cursor:pointer;font-size:12px;';
+    btnRemover.onclick = () => linha.remove();
+
+    linha.appendChild(selectCampo);
+    linha.appendChild(selectOp);
+    linha.appendChild(inputValor);
+    linha.appendChild(inputValor2);
+    linha.appendChild(btnRemover);
+    div.appendChild(linha);
+
+    atualizarOperadoresFiltro(linha, selectCampo.value);
+}
+
+function atualizarOperadoresFiltro(linha, campoId) {
+    const fonte = document.getElementById('rel_fonte').value;
+    const campo = (CAMPOS_RELATORIOS[fonte] || []).find(c => c.id === campoId);
+    const selectOp = linha.querySelector('select:nth-child(2)');
+    const inputValor = linha.querySelector('input');
+    const inputValor2 = linha.querySelectorAll('input')[1];
+
+    selectOp.innerHTML = '';
+    const ops = campo && campo.tipo === 'numero' ? [
+        ['igual', '='], ['maior', '>'], ['menor', '<'], ['entre', 'entre'], ['nao_igual', '≠']
+    ] : campo && campo.tipo === 'data' ? [
+        ['igual', '='], ['entre', 'entre'], ['nao_nulo', 'não vazio'], ['nulo', 'vazio']
+    ] : [
+        ['igual', '='], ['contem', 'contém'], ['nao_igual', '≠'], ['nao_nulo', 'não vazio'], ['nulo', 'vazio']
+    ];
+    ops.forEach(([v, l]) => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = l;
+        selectOp.appendChild(opt);
+    });
+
+    const op = selectOp.value;
+    const usaValor = !['nao_nulo', 'nulo'].includes(op);
+    inputValor.style.display = usaValor ? '' : 'none';
+    inputValor2.style.display = op === 'entre' ? '' : 'none';
+    if (campo && campo.tipo === 'data') {
+        inputValor.type = 'date';
+        inputValor2.type = 'date';
+    } else {
+        inputValor.type = 'text';
+        inputValor2.type = 'text';
+    }
+}
+
+function adicionarAgregacaoRelatorio() {
+    const fonte = document.getElementById('rel_fonte').value;
+    const campos = (CAMPOS_RELATORIOS[fonte] || []).filter(c => c.tipo === 'numero');
+    const div = document.getElementById('rel_agregacoes');
+
+    const linha = document.createElement('div');
+    linha.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;';
+
+    const selectCampo = document.createElement('select');
+    selectCampo.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;';
+    campos.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label;
+        selectCampo.appendChild(opt);
+    });
+
+    const selectFn = document.createElement('select');
+    selectFn.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;';
+    [['soma', 'Soma'], ['contagem', 'Contagem'], ['media', 'Média'], ['min', 'Mínimo'], ['max', 'Máximo']].forEach(([v, l]) => {
+        const opt = document.createElement('option');
+        opt.value = v;
+        opt.textContent = l;
+        selectFn.appendChild(opt);
+    });
+
+    const inputAlias = document.createElement('input');
+    inputAlias.style.cssText = 'padding:6px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:100px;';
+    inputAlias.placeholder = 'Nome da coluna';
+
+    const btnRemover = document.createElement('button');
+    btnRemover.textContent = '✖';
+    btnRemover.style.cssText = 'padding:4px 8px;border:1px solid #fecaca;border-radius:6px;background:#fef2f2;color:#dc2626;cursor:pointer;font-size:12px;';
+    btnRemover.onclick = () => linha.remove();
+
+    linha.appendChild(selectCampo);
+    linha.appendChild(selectFn);
+    linha.appendChild(inputAlias);
+    linha.appendChild(btnRemover);
+    div.appendChild(linha);
+}
+
+function montarConfigRelatorio() {
+    const fonte = document.getElementById('rel_fonte').value;
+    const campos = Array.from(document.querySelectorAll('.rel-campo-check:checked')).map(c => c.value);
+
+    const filtros = [];
+    document.querySelectorAll('#rel_filtros > div').forEach(linha => {
+        const selects = linha.querySelectorAll('select');
+        const inputs = linha.querySelectorAll('input');
+        const campo = selects[0].value;
+        const operador = selects[1].value;
+        const valor = inputs[0].value;
+        const valor2 = inputs[1] ? inputs[1].value : '';
+        if (['nao_nulo', 'nulo'].includes(operador)) {
+            filtros.push({ campo, operador });
+        } else if (valor) {
+            filtros.push({ campo, operador, valor, valor2 });
+        }
+    });
+
+    const grupo = Array.from(document.getElementById('rel_grupo').selectedOptions).map(o => o.value);
+
+    const agregacoes = [];
+    document.querySelectorAll('#rel_agregacoes > div').forEach(linha => {
+        const selects = linha.querySelectorAll('select');
+        const alias = linha.querySelector('input').value;
+        agregacoes.push({ campo: selects[0].value, funcao: selects[1].value, alias });
+    });
+
+    return { fonte, campos, filtros, grupo, agregacoes };
+}
+
+async function gerarRelatorioDinamico() {
+    const config = montarConfigRelatorio();
+    if (!config.campos.length && !config.agregacoes.length) {
+        showMessage('relatorio-message', 'Selecione ao menos um campo ou agregação.', 'error');
+        return;
+    }
+    relatorioConfigAtual = config;
+
+    try {
+        const res = await fetch(`${API_BASE}/relatorios/dinamico`, {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        const result = await res.json();
+        if (!result.success) throw new Error(result.message || 'Erro ao gerar relatório');
+
+        const { colunas, linhas } = result.data;
+        const thead = document.getElementById('rel_resultado_thead');
+        const tbody = document.getElementById('rel_resultado_tbody');
+        thead.innerHTML = '<tr>' + colunas.map(c => `<th style="padding:8px 12px;background:#f3f4f6;color:#374151;font-weight:600;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap;">${c}</th>`).join('') + '</tr>';
+        tbody.innerHTML = linhas.map(l =>
+            '<tr>' + l.map(v => `<td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${v === null || v === undefined ? '-' : v}</td>`).join('') + '</tr>'
+        ).join('') || '<tr><td colspan="' + colunas.length + '" style="text-align:center;color:#999;padding:16px;">Nenhum resultado</td></tr>';
+
+        document.getElementById('rel_resultado_total').textContent = `(${result.data.total} registros)`;
+        document.getElementById('rel_resultado_container').style.display = 'block';
+    } catch (err) {
+        showMessage('relatorio-message', 'Erro: ' + err.message, 'error');
+    }
+}
+
+function exportarRelatorioCSV() {
+    const thead = document.getElementById('rel_resultado_thead');
+    const tbody = document.getElementById('rel_resultado_tbody');
+    if (!thead.innerHTML) { showMessage('relatorio-message', 'Gere um relatório primeiro.', 'error'); return; }
+
+    const colunas = Array.from(thead.querySelectorAll('th')).map(th => th.textContent);
+    const linhas = Array.from(tbody.querySelectorAll('tr')).map(tr =>
+        Array.from(tr.querySelectorAll('td')).map(td => td.textContent)
+    );
+    const csv = [colunas, ...linhas].map(l => l.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'relatorio.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+}
+
+async function exportarRelatorioExcel() {
+    if (!relatorioConfigAtual) { showMessage('relatorio-message', 'Gere um relatório primeiro.', 'error'); return; }
+    try {
+        const res = await fetch(`${API_BASE}/relatorios/dinamico/exportar`, {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(relatorioConfigAtual)
+        });
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || 'Erro ao exportar');
+        }
+        const blob = await res.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'relatorio.xlsx';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch (err) {
+        showMessage('relatorio-message', 'Erro: ' + err.message, 'error');
+    }
+}
+
+// Inicializa o construtor ao carregar a página
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('rel_fonte')) atualizarCamposRelatorio();
+});
 
 </script>
 

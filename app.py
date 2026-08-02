@@ -1,4 +1,6 @@
-﻿from datetime import datetime, timezone, timedelta
+﻿from datetime import datetime, timezone, timedelta, date
+hoje_iso = date.today().isoformat()
+hoje_mais_30_iso = (date.today() + timedelta(days=30)).isoformat()
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token
 from flask_cors import CORS
@@ -3469,9 +3471,10 @@ def dashboard():
             ).fetchone()['total']
             calibracoes_vencer = conn.execute(
                 '''SELECT COUNT(*) as total FROM unidades
-                   WHERE requer_calibracao = 1
-                     AND data_validade_calibracao IS NOT NULL
-                     AND julianday(data_validade_calibracao) - julianday('now') BETWEEN 0 AND 30'''
+                WHERE requer_calibracao = 1
+                    AND data_validade_calibracao IS NOT NULL
+                    AND data_validade_calibracao >= ? AND data_validade_calibracao <= ?''',
+                (hoje_iso, hoje_mais_30_iso)
             ).fetchone()['total']
             maiores_consumidores = conn.execute(
                 '''SELECT c.nome,
@@ -3500,14 +3503,14 @@ def dashboard():
             ).fetchall()
             calibracoes_lista = conn.execute(
                 '''SELECT u.id, u.tag, u.numero_serie, p.nome as produto_nome,
-                          u.data_validade_calibracao,
-                          CAST(julianday(u.data_validade_calibracao) - julianday('now') AS INTEGER) as dias_restantes
-                   FROM unidades u
-                   LEFT JOIN produtos p ON u.produto_id = p.id
-                   WHERE u.requer_calibracao = 1
-                     AND u.data_validade_calibracao IS NOT NULL
-                     AND julianday(u.data_validade_calibracao) - julianday('now') BETWEEN 0 AND 30
-                   ORDER BY u.data_validade_calibracao'''
+                        u.data_validade_calibracao
+                FROM unidades u
+                LEFT JOIN produtos p ON u.produto_id = p.id
+                WHERE u.requer_calibracao = 1
+                    AND u.data_validade_calibracao IS NOT NULL
+                    AND u.data_validade_calibracao >= ? AND u.data_validade_calibracao <= ?
+                ORDER BY u.data_validade_calibracao''',
+                (hoje_iso, hoje_mais_30_iso)
             ).fetchall()
             # Valor do estoque de consumíveis (produtos que não controlam depreciação)
             valor_estoque_consumiveis = conn.execute(
@@ -3534,6 +3537,96 @@ def dashboard():
                 query_manutencao += ' AND data_envio <= ?'
                 params_manutencao.append(data_fim)
             total_gastos_manutencao = conn.execute(query_manutencao, params_manutencao).fetchone()['total']
+                        # ===== NOVOS KPIs (compatível SQLite + PostgreSQL) =====
+            # Valor total do estoque (todos os produtos)
+            valor_total_estoque = conn.execute(
+                '''SELECT COALESCE(SUM(e.quantidade * COALESCE(p.custo_medio, p.valor_unitario, 0)), 0)
+                   FROM estoque e
+                   JOIN produtos p ON p.id = e.produto_id'''
+            ).fetchone()[0]
+
+            # Saídas no período (para giro e cobertura)
+            query_saidas = """SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes
+                  WHERE tipo = 'saida' """
+            params_saidas = []
+            if data_inicio:
+                query_saidas += ' AND data >= ?'
+                params_saidas.append(data_inicio)
+            if data_fim:
+                query_saidas += ' AND data <= ?'
+                params_saidas.append(data_fim)
+            saidas_periodo = conn.execute(query_saidas, params_saidas).fetchone()[0]
+
+            # Estoque médio aproximado (valor total / custo médio médio)
+            # Giro de estoque = saídas no período / estoque médio
+            giro_estoque = round(saidas_periodo / max(valor_total_estoque, 1), 2) if valor_total_estoque else 0
+
+            # Cobertura (dias) = estoque atual / consumo médio diário
+            # Consumo médio diário = saídas nos últimos 30 dias / 30
+            saidas_30d = conn.execute(
+                "SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes WHERE tipo = 'saida'"
+            ).fetchone()[0]
+            consumo_diario = saidas_30d / 30.0 if saidas_30d else 0
+            cobertura_dias = round(valor_total_estoque / consumo_diario, 1) if consumo_diario else 0
+
+            # Unidades emprestadas + taxa de utilização
+            unidades_emprestadas = conn.execute(
+                "SELECT COUNT(*) FROM unidades WHERE status = 'emprestado'"
+            ).fetchone()[0]
+            total_unidades = conn.execute("SELECT COUNT(*) FROM unidades").fetchone()[0]
+            taxa_utilizacao = round(unidades_emprestadas / total_unidades * 100, 1) if total_unidades else 0
+
+            # ===== GRÁFICOS =====
+            # Curva ABC — top produtos por saída no período
+            query_abc = """SELECT p.nome as produto, COALESCE(SUM(m.quantidade), 0) as saidas
+                FROM movimentacoes m
+                JOIN produtos p ON p.id = m.produto_id
+                WHERE m.tipo = 'saida' """
+            params_abc = []
+            if data_inicio:
+                query_abc += ' AND m.data >= ?'
+                params_abc.append(data_inicio)
+            if data_fim:
+                query_abc += ' AND m.data <= ?'
+                params_abc.append(data_fim)
+            query_abc += ' GROUP BY p.id, p.nome ORDER BY saidas DESC LIMIT 10'
+            curva_abc = conn.execute(query_abc, params_abc).fetchall()
+
+            # Movimentações mensais — entradas vs saídas (substr funciona nos 2 bancos)
+            movimentacoes_mensais = conn.execute(
+                '''SELECT substr(data, 1, 7) as mes,
+                          COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN quantidade ELSE 0 END), 0) as entradas,
+                          COALESCE(SUM(CASE WHEN tipo = 'saida' THEN quantidade ELSE 0 END), 0) as saidas
+                   FROM movimentacoes
+                   GROUP BY substr(data, 1, 7)
+                   ORDER BY mes'''
+            ).fetchall()
+
+            # Valor por almoxarifado
+            valor_por_almoxarifado = conn.execute(
+                '''SELECT a.nome as almoxarifado,
+                          COALESCE(SUM(e.quantidade * COALESCE(p.custo_medio, p.valor_unitario, 0)), 0) as valor
+                   FROM estoque e
+                   JOIN almoxarifados a ON a.id = e.almoxarifado_id
+                   JOIN produtos p ON p.id = e.produto_id
+                   GROUP BY a.id, a.nome
+                   ORDER BY valor DESC'''
+            ).fetchall()
+
+            # Status das unidades
+            status_unidades = conn.execute(
+                "SELECT status, COUNT(*) as total FROM unidades GROUP BY status"
+            ).fetchall()
+
+            # Manutenções por fornecedor (tempo médio calculado no Python p/ compatibilidade)
+            manut_fornecedor = conn.execute(
+                '''SELECT fornecedor, COUNT(*) as total,
+                          COALESCE(SUM(custo), 0) as custo_total
+                   FROM manutencoes_unidades
+                   WHERE fornecedor IS NOT NULL AND fornecedor != '' AND status = 'concluida'
+                   GROUP BY fornecedor
+                   ORDER BY total DESC'''
+            ).fetchall()
         return response(True, data={
             'gastos_consumiveis': gastos_consumiveis,
             'aquisicoes_ativos': aquisicoes_ativos,
@@ -3550,7 +3643,21 @@ def dashboard():
             'vlc_total': depreciacao_totais.get('vlc_total', 0),
             'valor_residual_total': depreciacao_totais.get('valor_residual_total', 0),
             'depreciacao_acumulada_total': depreciacao_totais.get('depreciacao_acumulada_total', 0),
-            'total_gastos_manutencao': total_gastos_manutencao
+            'total_gastos_manutencao': total_gastos_manutencao,
+                        'kpis_novos': {
+                'valor_total_estoque': valor_total_estoque,
+                'giro_estoque': giro_estoque,
+                'cobertura_dias': cobertura_dias,
+                'unidades_emprestadas': unidades_emprestadas,
+                'taxa_utilizacao': taxa_utilizacao
+            },
+            'graficos': {
+                'curva_abc': [dict(r) for r in curva_abc],
+                'movimentacoes_mensais': [dict(r) for r in movimentacoes_mensais],
+                'valor_por_almoxarifado': [dict(r) for r in valor_por_almoxarifado],
+                'status_unidades': [dict(r) for r in status_unidades],
+                'manutencoes_fornecedor': [dict(r) for r in manut_fornecedor]
+            }
         })
     except Exception as e:
         return response(False, message=str(e), status_code=500)
@@ -4281,6 +4388,53 @@ def rejeitar_transferencia(transfer_id):
         import traceback; traceback.print_exc()
         return response(False, message='Erro ao rejeitar transferência.', status_code=500)
 
+@app.route('/relatorios/dinamico', methods=['POST'])
+@jwt_required()
+def relatorio_dinamico():
+    try:
+        dados = request.get_json(silent=True) or {}
+        colunas, linhas = _montar_relatorio_dinamico(dados)
+        return response(True, data={'colunas': colunas, 'linhas': linhas, 'total': len(linhas)})
+    except ValueError as e:
+        return response(False, message=str(e), status_code=400)
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
+
+@app.route('/relatorios/dinamico/exportar', methods=['POST'])
+@jwt_required()
+def relatorio_dinamico_exportar():
+    try:
+        dados = request.get_json(silent=True) or {}
+        colunas, linhas = _montar_relatorio_dinamico(dados)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Relatório'
+        ws.append(colunas)
+        for linha in linhas:
+            ws.append(linha)
+
+        # Ajusta largura das colunas automaticamente
+        for i, col in enumerate(colunas, start=1):
+            max_len = len(str(col))
+            for linha in linhas[:200]:
+                if i <= len(linha) and linha[i - 1] is not None:
+                    max_len = max(max_len, len(str(linha[i - 1])))
+            ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = min(max_len + 4, 50)
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name='relatorio.xlsx'
+        )
+    except ValueError as e:
+        return response(False, message=str(e), status_code=400)
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
 
 # ============================================================
 # EXECUÇÃO
@@ -4291,6 +4445,231 @@ for rule in app.url_map.iter_rules():
     print(f"  {rule.rule} -> {rule.endpoint}")
 
 init_db()
+
+# ============================================================
+# RELATÓRIOS DINÂMICOS — Fontes de dados (whitelist de campos)
+# ============================================================
+FONTES_RELATORIOS = {
+    'movimentacoes': {
+        'label': 'Movimentações',
+        'tabela': 'movimentacoes m',
+        'joins': """LEFT JOIN produtos p ON p.id = m.produto_id
+                    LEFT JOIN almoxarifados a ON a.id = m.almoxarifado_id
+                    LEFT JOIN colaboradores c ON c.id = m.colaborador_id""",
+        'campos': {
+            'data': ('m.data', 'Data'),
+            'tipo': ('m.tipo', 'Tipo'),
+            'produto': ('p.nome', 'Produto'),
+            'categoria': ('p.categoria', 'Categoria'),
+            'almoxarifado': ('a.nome', 'Almoxarifado'),
+            'colaborador': ('c.nome', 'Colaborador'),
+            'quantidade': ('m.quantidade', 'Quantidade'),
+            'valor_unitario': ('m.valor_unitario', 'Valor Unitário'),
+            'documento': ('m.documento', 'Documento'),
+            'tecnico': ('m.tecnico', 'Técnico'),
+            'ordem_servico': ('m.ordem_servico', 'Ordem de Serviço'),
+        },
+    },
+    'estoque': {
+        'label': 'Estoque',
+        'tabela': 'estoque e',
+        'joins': """JOIN produtos p ON p.id = e.produto_id
+                    JOIN almoxarifados a ON a.id = e.almoxarifado_id""",
+        'campos': {
+            'produto': ('p.nome', 'Produto'),
+            'categoria': ('p.categoria', 'Categoria'),
+            'almoxarifado': ('a.nome', 'Almoxarifado'),
+            'quantidade': ('e.quantidade', 'Quantidade'),
+            'estoque_minimo': ('COALESCE(e.estoque_minimo, p.estoque_minimo, 0)', 'Estoque Mínimo'),
+            'custo_medio': ('COALESCE(p.custo_medio, p.valor_unitario, 0)', 'Custo Médio'),
+            'valor_patrimonial': ('(e.quantidade * COALESCE(p.custo_medio, p.valor_unitario, 0))', 'Valor Patrimonial'),
+        },
+    },
+    'unidades': {
+        'label': 'Unidades',
+        'tabela': 'unidades u',
+        'joins': """LEFT JOIN produtos p ON p.id = u.produto_id
+                    LEFT JOIN almoxarifados a ON a.id = u.almoxarifado_id""",
+        'campos': {
+            'tag': ('u.tag', 'Tag'),
+            'numero_serie': ('u.numero_serie', 'Nº Série'),
+            'produto': ('p.nome', 'Produto'),
+            'status': ('u.status', 'Status'),
+            'almoxarifado': ('a.nome', 'Almoxarifado'),
+            'localizacao': ('u.localizacao', 'Localização'),
+            'requer_calibracao': ('u.requer_calibracao', 'Requer Calibração'),
+            'data_validade_calibracao': ('u.data_validade_calibracao', 'Validade Calibração'),
+            'valor_aquisicao': ('u.valor_aquisicao', 'Valor Aquisição'),
+            'vida_util_meses': ('u.vida_util_meses', 'Vida Útil (meses)'),
+        },
+    },
+    'manutencoes': {
+        'label': 'Manutenções',
+        'tabela': 'manutencoes_unidades mu',
+        'joins': """LEFT JOIN unidades u ON u.id = mu.unidade_id
+                    LEFT JOIN produtos p ON p.id = u.produto_id
+                    LEFT JOIN almoxarifados a ON a.id = mu.almoxarifado_origem_id""",
+        'campos': {
+            'tag': ('u.tag', 'Tag'),
+            'produto': ('p.nome', 'Produto'),
+            'fornecedor': ('mu.fornecedor', 'Fornecedor'),
+            'status': ('mu.status', 'Status'),
+            'descricao': ('mu.descricao', 'Descrição'),
+            'custo': ('mu.custo', 'Custo'),
+            'data_envio': ('mu.data_envio', 'Data Envio'),
+            'data_retorno': ('mu.data_retorno', 'Data Retorno'),
+            'almoxarifado_origem': ('a.nome', 'Almox. Origem'),
+        },
+    },
+    'emprestimos': {
+        'label': 'Empréstimos',
+        'tabela': 'emprestimos emp',
+        'joins': """LEFT JOIN unidades u ON u.id = emp.unidade_id
+                    LEFT JOIN produtos p ON p.id = u.produto_id
+                    LEFT JOIN colaboradores c ON c.id = emp.colaborador_id""",
+        'campos': {
+            'tag': ('u.tag', 'Tag'),
+            'produto': ('p.nome', 'Produto'),
+            'colaborador': ('c.nome', 'Colaborador'),
+            'data_emprestimo': ('emp.data_emprestimo', 'Data Empréstimo'),
+            'data_devolucao': ('emp.data_devolucao', 'Data Devolução'),
+            'status': ('emp.status', 'Status'),
+            'tipo': ('emp.tipo', 'Tipo'),
+        },
+    },
+}
+
+FUNCOES_AGREGACAO = {
+    'soma': 'SUM',
+    'contagem': 'COUNT',
+    'media': 'AVG',
+    'min': 'MIN',
+    'max': 'MAX',
+}
+
+def _montar_relatorio_dinamico(dados):
+    """Monta e executa a consulta do relatório dinâmico.
+    Retorna (colunas, linhas). Compatível SQLite + PostgreSQL."""
+    fonte = dados.get('fonte', '')
+    campos = dados.get('campos', [])
+    filtros = dados.get('filtros', [])
+    grupo = dados.get('grupo', [])
+    agregacoes = dados.get('agregacoes', [])
+    ordenar = dados.get('ordenar', '')
+    limite = min(int(dados.get('limite', 1000)), 5000)
+
+    if fonte not in FONTES_RELATORIOS:
+        raise ValueError('Fonte de dados inválida.')
+
+    cfg = FONTES_RELATORIOS[fonte]
+    campos_map = cfg['campos']
+
+    # ---- SELECT (campos simples) ----
+    selects = []
+    colunas = []
+    for c in campos:
+        if c in campos_map:
+            selects.append(campos_map[c][0])
+            colunas.append(campos_map[c][1])
+
+    # ---- Agregações ----
+    aggr_sql = []
+    aggr_colunas = []
+    for ag in agregacoes:
+        campo = ag.get('campo', '')
+        funcao = ag.get('funcao', '')
+        alias = ag.get('alias', '')
+        if campo not in campos_map or funcao not in FUNCOES_AGREGACAO:
+            continue
+        fn = FUNCOES_AGREGACAO[funcao]
+        col = campos_map[campo][0]
+        if funcao == 'contagem':
+            expr = 'COUNT(*)'
+        else:
+            expr = f'{fn}({col})'
+        aggr_sql.append(expr)
+        aggr_colunas.append(alias or f'{funcao}_{campo}')
+
+    usar_agregacao = bool(aggr_sql)
+
+    # ---- GROUP BY (campos de agrupamento) ----
+    grupo_validos = []
+    for g in grupo:
+        if g in campos_map:
+            grupo_validos.append(campos_map[g][0])
+
+    if usar_agregacao:
+        select_parts = grupo_validos + aggr_sql
+        select_sql = ', '.join(select_parts) if select_parts else '1'
+        colunas_finais = []
+        for g in grupo:
+            if g in campos_map:
+                colunas_finais.append(campos_map[g][1])
+        colunas_finais += aggr_colunas
+    else:
+        select_sql = ', '.join(selects) if selects else '1'
+        colunas_finais = colunas
+
+    # ---- WHERE (filtros) ----
+    where_parts = []
+    params = []
+    for f in filtros:
+        campo = f.get('campo', '')
+        operador = f.get('operador', '')
+        valor = f.get('valor', '')
+        if campo not in campos_map:
+            continue
+        col = campos_map[campo][0]
+        if operador == 'igual':
+            where_parts.append(f'{col} = ?')
+            params.append(valor)
+        elif operador == 'contem':
+            where_parts.append(f'CAST({col} AS TEXT) LIKE ?')
+            params.append(f'%{valor}%')
+        elif operador == 'nao_igual':
+            where_parts.append(f'{col} != ?')
+            params.append(valor)
+        elif operador == 'maior':
+            where_parts.append(f'{col} > ?')
+            params.append(valor)
+        elif operador == 'menor':
+            where_parts.append(f'{col} < ?')
+            params.append(valor)
+        elif operador == 'entre':
+            v2 = f.get('valor2', '')
+            where_parts.append(f'{col} >= ? AND {col} <= ?')
+            params.append(valor)
+            params.append(v2)
+        elif operador == 'nao_nulo':
+            where_parts.append(f'{col} IS NOT NULL')
+        elif operador == 'nulo':
+            where_parts.append(f'{col} IS NULL')
+
+    where_sql = ' WHERE ' + ' AND '.join(where_parts) if where_parts else ''
+
+    # ---- GROUP BY / ORDER BY / LIMIT ----
+    group_sql = ''
+    if usar_agregacao and grupo_validos:
+        group_sql = ' GROUP BY ' + ', '.join(grupo_validos)
+
+    order_sql = ''
+    if ordenar and ordenar in campos_map:
+        order_sql = ' ORDER BY ' + campos_map[ordenar][0]
+
+    params.append(limite)
+    query = f"""SELECT {select_sql}
+                FROM {cfg['tabela']}
+                {cfg['joins']}
+                {where_sql}
+                {group_sql}
+                {order_sql}
+                LIMIT ?"""
+
+    with get_connection() as conn:
+        linhas = conn.execute(query, params).fetchall()
+
+    resultado = [list(r) for r in linhas]
+    return colunas_finais, resultado
 
 if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'criar-usuario' and len(sys.argv) == 4:
