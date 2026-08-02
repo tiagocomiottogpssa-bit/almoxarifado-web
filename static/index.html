@@ -1889,8 +1889,8 @@ async function carregarDashboard() {
         document.getElementById('dash-card-calibracoes').textContent = calibVencer.length;
 
         // ===== NOVOS KPIs e GRÁFICOS =====
-        const kpis = result.data.kpis_novos || {};
-        const graficos = result.data.graficos || {};
+        const kpis = data.kpis_novos || {};
+        const graficos = data.graficos || {};
 
         // Cards novos
         const elValor = document.getElementById('dash-card-valor-estoque');

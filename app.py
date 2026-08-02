@@ -3537,17 +3537,17 @@ def dashboard():
                 query_manutencao += ' AND data_envio <= ?'
                 params_manutencao.append(data_fim)
             total_gastos_manutencao = conn.execute(query_manutencao, params_manutencao).fetchone()['total']
-                        # ===== NOVOS KPIs (compatível SQLite + PostgreSQL) =====
+            # ===== NOVOS KPIs (compatível SQLite + PostgreSQL) =====
             # Valor total do estoque (todos os produtos)
             valor_total_estoque = conn.execute(
-                '''SELECT COALESCE(SUM(e.quantidade * COALESCE(p.custo_medio, p.valor_unitario, 0)), 0)
+                '''SELECT COALESCE(SUM(e.quantidade * COALESCE(p.custo_medio, p.valor_unitario, 0)), 0) as total
                    FROM estoque e
                    JOIN produtos p ON p.id = e.produto_id'''
-            ).fetchone()[0]
+            ).fetchone()['total']
 
             # Saídas no período (para giro e cobertura)
-            query_saidas = """SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes
-                  WHERE tipo = 'saida' """
+            query_saidas = """SELECT COALESCE(SUM(quantidade), 0) as total FROM movimentacoes
+                              WHERE tipo = 'saida' """
             params_saidas = []
             if data_inicio:
                 query_saidas += ' AND data >= ?'
@@ -3555,25 +3555,23 @@ def dashboard():
             if data_fim:
                 query_saidas += ' AND data <= ?'
                 params_saidas.append(data_fim)
-            saidas_periodo = conn.execute(query_saidas, params_saidas).fetchone()[0]
+            saidas_periodo = conn.execute(query_saidas, params_saidas).fetchone()['total']
 
-            # Estoque médio aproximado (valor total / custo médio médio)
             # Giro de estoque = saídas no período / estoque médio
             giro_estoque = round(saidas_periodo / max(valor_total_estoque, 1), 2) if valor_total_estoque else 0
 
             # Cobertura (dias) = estoque atual / consumo médio diário
-            # Consumo médio diário = saídas nos últimos 30 dias / 30
             saidas_30d = conn.execute(
-                "SELECT COALESCE(SUM(quantidade), 0) FROM movimentacoes WHERE tipo = 'saida'"
-            ).fetchone()[0]
+                "SELECT COALESCE(SUM(quantidade), 0) as total FROM movimentacoes WHERE tipo = 'saida'"
+            ).fetchone()['total']
             consumo_diario = saidas_30d / 30.0 if saidas_30d else 0
             cobertura_dias = round(valor_total_estoque / consumo_diario, 1) if consumo_diario else 0
 
             # Unidades emprestadas + taxa de utilização
             unidades_emprestadas = conn.execute(
-                "SELECT COUNT(*) FROM unidades WHERE status = 'emprestado'"
-            ).fetchone()[0]
-            total_unidades = conn.execute("SELECT COUNT(*) FROM unidades").fetchone()[0]
+                "SELECT COUNT(*) as total FROM unidades WHERE status = 'emprestado'"
+            ).fetchone()['total']
+            total_unidades = conn.execute("SELECT COUNT(*) as total FROM unidades").fetchone()['total']
             taxa_utilizacao = round(unidades_emprestadas / total_unidades * 100, 1) if total_unidades else 0
 
             # ===== GRÁFICOS =====
