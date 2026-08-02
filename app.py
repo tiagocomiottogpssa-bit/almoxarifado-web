@@ -2,6 +2,8 @@
 hoje_iso = date.today().isoformat()
 hoje_mais_30_iso = (date.today() + timedelta(days=30)).isoformat()
 hoje_mais_60_iso = (date.today() + timedelta(days=60)).isoformat()
+# Perfis de acesso válidos no sistema (RBAC)
+PERFIS_VALIDOS = ('admin', 'supervisor', 'operador', 'comprador', 'visualizador')
 DIAS_ALERTA_PREVENTIVA = 60
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token
@@ -129,8 +131,9 @@ def registro():
     if not username or not password:
         return response(False, message='Username e password são obrigatórios.', status_code=400)
 
-    if perfil not in ('admin', 'operador', 'visualizador'):
-        return response(False, message='Perfil inválido. Use admin, operador ou visualizador.', status_code=400)
+        PERFIS_VALIDOS = ('admin', 'supervisor', 'operador', 'comprador', 'visualizador')
+    if perfil not in PERFIS_VALIDOS:
+        return response(False, message='Perfil inválido. Use admin, supervisor, operador, comprador ou visualizador.', status_code=400)
 
     try:
         with get_connection() as conn:
@@ -198,7 +201,7 @@ def atualizar_usuario(id):
     perfil = data.get('perfil')
     ativo = data.get('ativo')
 
-    if perfil and perfil not in ('admin', 'operador', 'visualizador'):
+    if perfil and perfil not in PERFIS_VALIDOS:
         return response(False, message='Perfil inválido.', status_code=400)
 
     try:
@@ -336,6 +339,7 @@ def listar_produtos():
 
 @app.route('/produtos', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def criar_produto():
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
@@ -384,6 +388,7 @@ def criar_produto():
 
 @app.route('/produtos/<int:id>', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def atualizar_produto(id):
     data = request.get_json() or {}
 
@@ -459,6 +464,7 @@ def atualizar_produto(id):
 
 @app.route('/produtos/<int:id>', methods=['DELETE'])
 @jwt_required()
+@perfil_required('admin')
 def excluir_produto(id):
     try:
         with get_connection() as conn:
@@ -486,6 +492,7 @@ def excluir_produto(id):
 
 @app.route('/produtos/importar', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def importar_produtos():
     data = request.get_json() or {}
     produtos = data.get('produtos', [])
@@ -610,6 +617,7 @@ def listar_almoxarifados():
 
 @app.route('/almoxarifados', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def criar_almoxarifado():
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
@@ -656,6 +664,7 @@ def criar_almoxarifado():
 
 @app.route('/almoxarifados/<int:id>', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def atualizar_almoxarifado(id):
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
@@ -693,6 +702,7 @@ def atualizar_almoxarifado(id):
 
 @app.route('/almoxarifados/<int:id>', methods=['DELETE'])
 @jwt_required()
+@perfil_required('admin')
 def excluir_almoxarifado(id):
     try:
         with get_connection() as conn:
@@ -904,6 +914,7 @@ def listar_colaboradores():
 
 @app.route('/colaboradores', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def criar_colaborador():
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
@@ -962,6 +973,7 @@ def criar_colaborador():
 
 @app.route('/colaboradores/<int:id>', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def atualizar_colaborador(id):
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
@@ -1009,6 +1021,7 @@ def atualizar_colaborador(id):
 
 @app.route('/colaboradores/<int:id>', methods=['DELETE'])
 @jwt_required()
+@perfil_required('admin')
 def excluir_colaborador(id):
     try:
         with get_connection() as conn:
@@ -1037,6 +1050,7 @@ def excluir_colaborador(id):
 
 @app.route('/colaboradores/exportar', methods=['GET'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador', 'comprador')
 def exportar_colaboradores():
     try:
         with get_connection() as conn:
@@ -1081,6 +1095,7 @@ def exportar_colaboradores():
 
 @app.route('/colaboradores/importar', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def importar_colaboradores():
     if 'file' not in request.files:
         return response(False, message='Nenhum arquivo enviado.', status_code=400)
@@ -1318,6 +1333,7 @@ def listar_unidades():
 
 @app.route('/unidades', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def criar_unidade():
     data = request.get_json() or {}
     produto_id = data.get('produto_id')
@@ -1400,6 +1416,7 @@ def criar_unidade():
 
 @app.route('/unidades/<int:id>', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def atualizar_unidade(id):
     data = request.get_json() or {}
     produto_id = data.get('produto_id')
@@ -1479,6 +1496,7 @@ def atualizar_unidade(id):
 
 @app.route('/unidades/<int:id>', methods=['DELETE'])
 @jwt_required()
+@perfil_required('admin')
 def excluir_unidade(id):
     try:
         with get_connection() as conn:
@@ -1512,6 +1530,7 @@ def excluir_unidade(id):
 
 @app.route('/unidades/<int:id>/manutencao', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def iniciar_manutencao_unidade(id):
     data = request.get_json() or {}
     descricao = data.get('descricao')
@@ -1584,6 +1603,7 @@ def iniciar_manutencao_unidade(id):
 
 @app.route('/unidades/<int:id>/manutencao/retorno', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def retornar_manutencao_unidade(id):
     data = request.get_json() or {}
     custo = data.get('custo')
@@ -1670,6 +1690,7 @@ def retornar_manutencao_unidade(id):
 
 @app.route('/unidades/manutencao/retorno/lote', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def retornar_manutencao_lote():
     data = request.get_json() or {}
     unidades_ids = data.get('unidades_ids', [])
@@ -1775,6 +1796,7 @@ def retornar_manutencao_lote():
 
 @app.route('/unidades/exportar', methods=['GET'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador', 'comprador')
 def exportar_unidades():
     try:
         with get_connection() as conn:
@@ -1817,6 +1839,7 @@ def exportar_unidades():
 
 @app.route('/unidades/transferir', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def transferir_unidades_lote():
     data = request.get_json() or {}
     unidades_ids = data.get('unidades_ids', [])
@@ -1904,6 +1927,7 @@ def transferir_unidades_lote():
 
 @app.route('/unidades/importar', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def importar_unidades():
     if 'file' not in request.files:
         return response(False, message='Nenhum arquivo enviado.', status_code=400)
@@ -1981,6 +2005,7 @@ def importar_unidades():
 
 @app.route('/unidades/manutencao/lote', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def enviar_unidades_manutencao_lote():
     data = request.get_json() or {}
     unidades_ids = data.get('unidades_ids', [])
@@ -2072,6 +2097,7 @@ def enviar_unidades_manutencao_lote():
 
 @app.route('/unidades/manutencao/preventiva', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def manutencao_preventiva():
     data = request.get_json() or {}
     unidades_ids = data.get('unidades_ids', [])
@@ -2157,6 +2183,7 @@ def buscar_unidade_por_tag():
 
 @app.route('/movimentacoes/emprestimo-rapido', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def emprestimo_rapido():
     data = request.get_json()
     if not data:
@@ -2220,6 +2247,7 @@ def emprestimo_rapido():
 
 @app.route('/movimentacoes/devolucao-rapida', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def devolucao_rapida():
     data = request.get_json()
     if not data:
@@ -2271,6 +2299,7 @@ def devolucao_rapida():
 
 @app.route('/estoque/exportar', methods=['GET'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador', 'comprador')
 def exportar_estoque():
     try:
         with get_connection() as conn:
@@ -2362,6 +2391,7 @@ def listar_estoque():
 
 @app.route('/estoque', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def upsert_estoque():
     data = request.get_json() or {}
     produto_id = data.get('produto_id')
@@ -2443,6 +2473,7 @@ def upsert_estoque():
 
 @app.route('/estoque/transferir', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor')
 def transferir_estoque():
     data = request.get_json() or {}
     origem_id = data.get('origem_id')
@@ -2514,6 +2545,7 @@ def transferir_estoque():
 
 @app.route('/estoque/importar', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def importar_estoque():
     if 'file' not in request.files:
         return response(False, message='Nenhum arquivo enviado.', status_code=400)
@@ -2615,6 +2647,7 @@ def importar_estoque():
 
 @app.route('/estoque/<int:id>/minimo', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def atualizar_estoque_minimo_aba_estoque(id):
     data = request.get_json() or {}
     novo_minimo = data.get('estoque_minimo')
@@ -2744,6 +2777,7 @@ def listar_movimentacoes():
 
 @app.route('/movimentacoes', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def criar_movimentacao():
     data = request.get_json(silent=True) or {}
 
@@ -3096,6 +3130,7 @@ def buscar_produto_por_codigo():
 
 @app.route('/movimentacoes/retirada-rapida', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def retirada_rapida():
     data = request.get_json(silent=True) or {}
     colaborador_id = data.get('colaborador_id')
@@ -3194,6 +3229,7 @@ def retirada_rapida():
 
 @app.route('/movimentacoes/devolucao-unidade', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def devolucao_unidade():
     data = request.get_json(silent=True) or {}
     colaborador_id = data.get('colaborador_id')
@@ -3324,6 +3360,7 @@ def listar_emprestimos():
 
 @app.route('/emprestimos', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def criar_emprestimo():
     data = request.get_json() or {}
     unidade_id = data.get('unidade_id')
@@ -3354,6 +3391,7 @@ def criar_emprestimo():
 
 @app.route('/emprestimos/devolver', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador')
 def devolver_emprestimo():
     data = request.get_json() or {}
     unidade_id = data.get('unidade_id')
@@ -3821,6 +3859,7 @@ def obter_pedido(id):
 
 @app.route('/pedidos', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'comprador')
 def criar_pedido():
     try:
         data = request.get_json(silent=True) or {}
@@ -3856,6 +3895,7 @@ def criar_pedido():
 
 @app.route('/pedidos/<int:id>', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'comprador')
 def atualizar_pedido(id):
     try:
         data = request.get_json(silent=True) or {}
@@ -3922,6 +3962,7 @@ def deletar_pedido(id):
 
 @app.route('/pedidos/<int:id>/transferir', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'comprador')
 @perfil_required('admin', 'operador')
 def transferir_itens_pedido(id):
     try:
@@ -4085,6 +4126,7 @@ def transferir_itens_pedido(id):
 
 @app.route('/pedidos/<int:id>/status', methods=['PUT'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'comprador')
 def avancar_status_pedido(id):
     try:
         data = request.get_json(silent=True) or {}
@@ -4464,6 +4506,25 @@ def rejeitar_transferencia(transfer_id):
 def relatorio_dinamico():
     try:
         dados = request.get_json(silent=True) or {}
+
+        # ===== Filtro de fontes por perfil (B.6) =====
+        current_user = get_jwt_identity()
+        with get_connection() as conn:
+            user = conn.execute('SELECT perfil FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            perfil = user['perfil'] if user else 'visualizador'
+
+        FONTES_RESTRITAS = {
+            'admin': set(),
+            'supervisor': set(),
+            'operador': {'auditoria'},
+            'comprador': {'auditoria', 'manutencoes', 'calibracoes'},
+            'visualizador': {'auditoria', 'manutencoes', 'calibracoes'},
+        }
+        fonte = dados.get('fonte')
+        if fonte in FONTES_RESTRITAS.get(perfil, set()):
+            return response(False, message='Fonte não disponível para o seu perfil.', status_code=403)
+        # ===== Fim do filtro (B.6) =====
+
         colunas, linhas = _montar_relatorio_dinamico(dados)
         return response(True, data={'colunas': colunas, 'linhas': linhas, 'total': len(linhas)})
     except ValueError as e:
@@ -4473,6 +4534,7 @@ def relatorio_dinamico():
 
 @app.route('/relatorios/dinamico/exportar', methods=['POST'])
 @jwt_required()
+@perfil_required('admin', 'supervisor', 'operador', 'comprador')
 def relatorio_dinamico_exportar():
     try:
         dados = request.get_json(silent=True) or {}

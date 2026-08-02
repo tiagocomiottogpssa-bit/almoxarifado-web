@@ -985,6 +985,8 @@ th, td {
                         <option value="admin">Administrador</option>
                         <option value="operador">Operador</option>
                         <option value="visualizador">Visualizador</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="comprador">Comprador</option>
                     </select>
                 </div>
                 <div class="form-group" style="flex: 1;">
@@ -2457,40 +2459,40 @@ function limparFormUsuario() {
 }
 
 function aplicarPermissoes(perfil) {
-    // Mostra/esconde abas conforme o perfil
     const abas = document.querySelectorAll('.tab-btn');
+    const PERFIS_ESCRITA = ['admin', 'supervisor', 'operador'];
+    const PERFIS_MANUT = ['admin', 'supervisor'];
+    const PERFIS_COMPRA = ['admin', 'supervisor', 'comprador'];
+    const PERFIS_EXPORTA = ['admin', 'supervisor', 'operador', 'comprador'];
+
     abas.forEach(aba => {
         const tabName = aba.getAttribute('data-tab');
-        
-        // Aba de Auditoria: só admin vê
-        if (tabName === 'auditoria') {
-            aba.style.display = (perfil === 'admin') ? '' : 'none';
-        }
-        
-        // Aba de Usuários: admin e operador veem
-        if (tabName === 'usuarios') {
-            aba.style.display = (perfil === 'admin' || perfil === 'operador') ? '' : 'none';
-        }
+        if (tabName === 'auditoria') aba.style.display = (perfil === 'admin' || perfil === 'supervisor') ? '' : 'none';
+        if (tabName === 'usuarios') aba.style.display = (perfil === 'admin') ? '' : 'none';
+        if (tabName === 'pedidos') aba.style.display = (perfil === 'admin' || perfil === 'supervisor' || perfil === 'comprador') ? '' : 'none';
     });
-    
-    // Desabilita formulários e botões de ação para visualizador
+
+    // Visualizador: só leitura, sem exportar
     if (perfil === 'visualizador') {
         document.querySelectorAll('form').forEach(f => f.style.display = 'none');
-        document.querySelectorAll('.btn-primary, .btn-success').forEach(btn => {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            btn.style.cursor = 'not-allowed';
-        });
-        document.querySelectorAll('[onclick*="importar"], [onclick*="exportar"]').forEach(btn => {
-            btn.style.display = 'none';
-        });
+        document.querySelectorAll('.btn-primary, .btn-success').forEach(btn => { btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; });
+        document.querySelectorAll('[onclick*="importar"], [onclick*="exportar"]').forEach(btn => btn.style.display = 'none');
     }
-    
-    // Para operador: esconde apenas botões de excluir
+
+    // Operador: esconde excluir, manutenção e pedidos
     if (perfil === 'operador') {
-        document.querySelectorAll('[onclick*="excluir"], [onclick*="delete"]').forEach(btn => {
-            btn.style.display = 'none';
-        });
+        document.querySelectorAll('[onclick*="excluir"], [onclick*="delete"]').forEach(btn => btn.style.display = 'none');
+        document.querySelectorAll('[onclick*="manutencao"], [onclick*="preventiva"], [onclick*="estornar"]').forEach(btn => btn.style.display = 'none');
+    }
+
+    // Comprador: esconde saídas, manutenção, cadastro de ativos
+    if (perfil === 'comprador') {
+        document.querySelectorAll('[onclick*="excluir"], [onclick*="delete"], [onclick*="manutencao"], [onclick*="preventiva"], [onclick*="saida"], [onclick*="retirada"]').forEach(btn => btn.style.display = 'none');
+    }
+
+    // Supervisor: esconde apenas exclusões
+    if (perfil === 'supervisor') {
+        document.querySelectorAll('[onclick*="excluir"], [onclick*="delete"]').forEach(btn => btn.style.display = 'none');
     }
 }
 
