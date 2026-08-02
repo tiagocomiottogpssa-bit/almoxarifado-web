@@ -3592,12 +3592,12 @@ def dashboard():
 
             # Movimentações mensais — entradas vs saídas (substr funciona nos 2 bancos)
             movimentacoes_mensais = conn.execute(
-                '''SELECT substr(data, 1, 7) as mes,
-                          COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN quantidade ELSE 0 END), 0) as entradas,
-                          COALESCE(SUM(CASE WHEN tipo = 'saida' THEN quantidade ELSE 0 END), 0) as saidas
-                   FROM movimentacoes
-                   GROUP BY substr(data, 1, 7)
-                   ORDER BY mes'''
+                '''SELECT substr(CAST(data AS TEXT), 1, 7) as mes,
+                        COALESCE(SUM(CASE WHEN tipo = 'entrada' THEN quantidade ELSE 0 END), 0) as entradas,
+                        COALESCE(SUM(CASE WHEN tipo = 'saida' THEN quantidade ELSE 0 END), 0) as saidas
+                FROM movimentacoes
+                GROUP BY substr(CAST(data AS TEXT), 1, 7)
+                ORDER BY mes'''
             ).fetchall()
 
             # Valor por almoxarifado

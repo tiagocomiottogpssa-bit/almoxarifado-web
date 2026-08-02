@@ -1850,7 +1850,7 @@ async function carregarDashboard() {
         try {
             const resDash = await fetch(`${API_BASE}/dashboard`, { headers });
             const dashData = await resDash.json();
-            const data = dashData.data || dashData;
+            var data = dashData.data || dashData;
             document.getElementById('dash-card-consumiveis').textContent = `R$ ${(data.gastos_consumiveis || 0).toFixed(2)}`;
             document.getElementById('dash-card-depreciacao').textContent = `R$ ${(data.vlc_total || 0).toFixed(2)}`;
             document.getElementById('dash-card-manutencao-custo').textContent = `R$ ${(data.total_gastos_manutencao || 0).toFixed(2)}`;
@@ -1889,8 +1889,8 @@ async function carregarDashboard() {
         document.getElementById('dash-card-calibracoes').textContent = calibVencer.length;
 
         // ===== NOVOS KPIs e GRÁFICOS =====
-        const kpis = data.kpis_novos || {};
-        const graficos = data.graficos || {};
+        const kpis = (data && data.kpis_novos) || {};
+        const graficos = (data && data.graficos) || {};
 
         // Cards novos
         const elValor = document.getElementById('dash-card-valor-estoque');
