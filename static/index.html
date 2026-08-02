@@ -531,6 +531,7 @@ th, td {
             <option value="unidades">Unidades</option>
             <option value="manutencoes">Manutenções</option>
             <option value="emprestimos">Empréstimos</option>
+            <option value="auditoria">Auditoria</option>
         </select>
     </div>
 
@@ -6185,6 +6186,15 @@ const CAMPOS_RELATORIOS = {
         { id: 'data_devolucao', label: 'Data Devolução', tipo: 'data' },
         { id: 'status', label: 'Status', tipo: 'texto' },
         { id: 'tipo', label: 'Tipo', tipo: 'texto' }
+    ],
+        auditoria: [
+        { id: 'id', label: 'ID', tipo: 'numero' },
+        { id: 'data', label: 'Data', tipo: 'data' },
+        { id: 'usuario', label: 'Usuário', tipo: 'texto' },
+        { id: 'perfil', label: 'Perfil', tipo: 'texto' },
+        { id: 'acao', label: 'Ação', tipo: 'texto' },
+        { id: 'tabela_afetada', label: 'Tabela', tipo: 'texto' },
+        { id: 'descricao', label: 'Descrição', tipo: 'texto' }
     ]
 };
 

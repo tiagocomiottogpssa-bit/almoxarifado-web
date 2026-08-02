@@ -4537,6 +4537,20 @@ FONTES_RELATORIOS = {
             'tipo': ('emp.tipo', 'Tipo'),
         },
     },
+    'auditoria': {
+        'label': 'Auditoria',
+        'tabela': 'log_auditoria la',
+        'joins': 'LEFT JOIN usuarios u2 ON u2.id = la.usuario_id',
+        'campos': {
+            'id': ('la.id', 'ID'),
+            'data': ('la.data', 'Data'),
+            'usuario': ('la.usuario_nome', 'Usuário'),
+            'perfil': ('u2.perfil', 'Perfil'),
+            'acao': ('la.acao', 'Ação'),
+            'tabela_afetada': ('la.tabela', 'Tabela'),
+            'descricao': ('la.descricao', 'Descrição'),
+        },
+    },
 }
 
 FUNCOES_AGREGACAO = {
