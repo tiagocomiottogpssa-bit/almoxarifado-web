@@ -662,6 +662,30 @@ th, td {
                     </div>
                 </div>
 
+                <!-- Linha 5: Manutenção Preventiva -->
+                <div class="form-group" style="margin-top: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="unidade_tem_preventiva" onchange="toggleCamposPreventiva()" style="width: 16px; height: 16px;">
+                        <span style="font-size: 13px; font-weight: 600; color: #374151;">Manutenção preventiva periódica</span>
+                    </label>
+                </div>
+                <div id="campos_preventiva" style="display: none; margin-top: 12px;">
+                    <div style="display: flex; gap: 16px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Periodicidade (dias) <span style="color: #ef4444;">*</span></label>
+                            <input type="number" id="unidade_periodicidade_preventiva" min="1" placeholder="Ex: 90">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Data última preventiva</label>
+                            <input type="date" id="unidade_data_ultima_preventiva">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Data próxima preventiva</label>
+                            <input type="date" id="unidade_data_proxima_preventiva">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Linha 3: Localização -->
                 <div class="form-group" style="margin-top: 12px;">
                     <label>Localização</label>
@@ -708,6 +732,8 @@ th, td {
                                 <th style="width:80px; min-width:80px;">Status</th>
                                 <th style="width:120px; min-width:120px;">Localização</th>
                                 <th style="width:120px; min-width:120px;">Almoxarifado</th>
+                                <th style="width:130px; min-width:130px;">Próx. Preventiva</th>
+                                <th style="width:130px; min-width:130px;">Próx. Calibração</th>
                                 <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                             </tr>
                         </thead>
@@ -1063,6 +1089,10 @@ th, td {
                 <div style="font-size: 13px; color: #dc2626; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Calibrações a Vencer</div>
                 <div style="font-size: 28px; font-weight: 700; color: #991b1b; margin-top: 8px;" id="dash-card-calibracoes">0</div>
                 <div style="font-size: 12px; color: #6b7280; margin-top: 4px;">Próximos 30 dias</div>
+            </div>
+            <div class="dash-card" style="padding:16px;text-align:center;">
+                <div style="font-size:13px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Preventivas a Vencer (60d)</div>
+                <div style="font-size:26px;font-weight:700;color:#374151;margin-top:8px;" id="dash-card-preventivas">0</div>
             </div>
             <div class="dash-card" style="background: linear-gradient(135deg,#059669,#047857);">
                 <div style="font-size:13px;color:#d1fae5;font-weight:600;text-transform:uppercase;letter-spacing:.5px;">Valor Total Estoque</div>
@@ -1907,6 +1937,9 @@ async function carregarDashboard() {
             return val >= hoje && val <= daqui30;
         });
         document.getElementById('dash-card-calibracoes').textContent = calibVencer.length;
+
+        const elPrev = document.getElementById('dash-card-preventivas');
+        if (elPrev) elPrev.textContent = (data.preventivas_60d || 0) + (data.preventivas_vencidas ? ` (${data.preventivas_vencidas} vencidas)` : '');
 
         // ===== NOVOS KPIs e GRÁFICOS =====
         const kpis = (data && data.kpis_novos) || {};
@@ -4051,6 +4084,8 @@ function loadUnidades() {
                 <td>${renderStatusUnidade(u.status)}</td>
                 <td>${u.localizacao || '-'}</td>
                 <td>${u.almoxarifado_nome || '-'}</td>
+                <td>${badgePreventiva(u.data_proxima_preventiva)}</td>
+                <td>${badgeCalibracao(u.data_validade_calibracao)}</td>
                 <td style="text-align: center;">
                     <button class="btn-sm btn-primary" onclick="editarUnidade(${u.id})">✏️</button>
                     <button class="btn-sm btn-danger" onclick="excluirUnidade(${u.id})">🗑️</button>
@@ -4075,6 +4110,21 @@ function renderStatusUnidade(status) {
     return map[status] || status || '-';
 }
 
+function badgePreventiva(dataProx) {
+    if (!dataProx) return '<span style="color:#9ca3af;">—</span>';
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const prox = new Date(dataProx.slice(0,10) + 'T00:00:00');
+    const dias = Math.ceil((prox - hoje) / (1000*60*60*24));
+    if (dias < 0) return `<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">Vencida ${Math.abs(dias)}d</span>`;
+    if (dias <= 30) return `<span style="background:#ffedd5;color:#ea580c;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">${dias}d</span>`;
+    if (dias <= 60) return `<span style="background:#fef9c3;color:#ca8a04;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600;">${dias}d</span>`;
+    return `<span style="color:#16a34a;font-size:12px;font-weight:600;">${dias}d</span>`;
+}
+function badgeCalibracao(dataVal) {
+    if (!dataVal) return '<span style="color:#9ca3af;">—</span>';
+    return badgePreventiva(dataVal);
+}
+
 // ===== UNIDADES =====
 
 function salvarUnidade() {
@@ -4083,6 +4133,14 @@ function salvarUnidade() {
     const tag = document.getElementById('unidade_tag').value.trim();
     const numero_serie = document.getElementById('unidade_serie').value.trim();
     const status = document.querySelector('input[name="unidade_status"]:checked')?.value || 'disponivel';
+    const tem_preventiva = document.getElementById('unidade_tem_preventiva').checked;
+    const periodicidade_preventiva = tem_preventiva ? parseInt(document.getElementById('unidade_periodicidade_preventiva').value) : null;
+    const data_ultima_preventiva = document.getElementById('unidade_data_ultima_preventiva').value || null;
+    const data_proxima_preventiva = document.getElementById('unidade_data_proxima_preventiva').value || null;
+    if (tem_preventiva && !periodicidade_preventiva) {
+        alert('Informe a periodicidade da preventiva em dias.');
+        return;
+    }
 
     if (!produto_id) {
         alert('Selecione um produto.');
@@ -4094,7 +4152,7 @@ function salvarUnidade() {
         return;
     }
 
-        const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token');
     const localizacao = document.getElementById('unidade_localizacao').value.trim();
     const requer_calibracao = document.getElementById('unidade_requer_calibracao').checked;
     const data_validade_calibracao = document.getElementById('unidade_data_validade_calibracao').value;
@@ -4119,7 +4177,10 @@ function salvarUnidade() {
         localizacao,
         requer_calibracao,
         data_validade_calibracao: data_validade_calibracao || null,
-        numero_certificado: numero_certificado || null
+        numero_certificado: numero_certificado || null,
+        periodicidade_preventiva_dias: periodicidade_preventiva,
+        data_ultima_preventiva: data_ultima_preventiva,
+        data_proxima_preventiva: data_proxima_preventiva
     };
 
     const url = id
@@ -4155,6 +4216,11 @@ function toggleCamposCalibracao() {
     document.getElementById('campos_calibracao').style.display = checked ? 'flex' : 'none';
 }
 
+function toggleCamposPreventiva() {
+    const checked = document.getElementById('unidade_tem_preventiva').checked;
+    document.getElementById('campos_preventiva').style.display = checked ? 'flex' : 'none';
+}
+
 function limparFormUnidade() {
     document.getElementById('unidadeId').value = '';
     document.getElementById('unidade_tag').value = '';
@@ -4166,6 +4232,11 @@ function limparFormUnidade() {
     document.getElementById('unidade_data_validade_calibracao').value = '';
     document.getElementById('unidade_numero_certificado').value = '';
     toggleCamposCalibracao();
+    document.getElementById('unidade_tem_preventiva').checked = false;
+    document.getElementById('unidade_periodicidade_preventiva').value = '';
+    document.getElementById('unidade_data_ultima_preventiva').value = '';
+    document.getElementById('unidade_data_proxima_preventiva').value = '';
+    toggleCamposPreventiva();
 }
 
 function editarUnidade(id) {
@@ -4188,6 +4259,12 @@ function editarUnidade(id) {
         document.getElementById('unidade_data_validade_calibracao').value = unidade.data_validade_calibracao || '';
         document.getElementById('unidade_numero_certificado').value = unidade.numero_certificado || '';
         toggleCamposCalibracao();
+        const temPrev = !!unidade.periodicidade_preventiva_dias;
+        document.getElementById('unidade_tem_preventiva').checked = temPrev;
+        document.getElementById('unidade_periodicidade_preventiva').value = unidade.periodicidade_preventiva_dias || '';
+        document.getElementById('unidade_data_ultima_preventiva').value = unidade.data_ultima_preventiva || '';
+        document.getElementById('unidade_data_proxima_preventiva').value = unidade.data_proxima_preventiva || '';
+        toggleCamposPreventiva();
 
         const radio = document.querySelector(`input[name="unidade_status"][value="${unidade.status}"]`);
         if (radio) radio.checked = true;
@@ -5231,11 +5308,21 @@ function carregarUnidadesManutencaoLote() {
     unidadesManutencaoCache = [];
     const t = todasUnidadesManutencao;  // usa o cache (sem fetch)
     unidadesManutencaoCache = t.filter(u => u.status === 'com_defeito' && (!almoxId || String(u.almoxarifado_id) === String(almoxId)));
+    // dentro do template de cada unidade no modal
+    const hojeISO = new Date().toISOString().slice(0,10);
+    const motivo = (u.status === 'com_defeito') ? '<span style="color:#dc2626;font-size:12px;">Defeito</span>'
+    : (u.data_proxima_preventiva && u.data_proxima_preventiva.slice(0,10) <= hojeISO ? '<span style="color:#ea580c;font-size:12px;">Preventiva vencida</span>'
+    : (u.data_validade_calibracao && u.data_validade_calibracao.slice(0,10) <= hojeISO ? '<span style="color:#d97706;font-size:12px;">Calibração vencida</span>' : ''));
     renderizarListaManutencao();
 }
 function renderizarListaManutencao() {
     const listaDiv = document.getElementById('manut_lote_lista');
     const f = (document.getElementById('manut_lote_filtro').value || '').toLowerCase();
+    // dentro do template de cada unidade no modal
+    const hojeISO = new Date().toISOString().slice(0,10);
+    const motivo = (u.status === 'com_defeito') ? '<span style="color:#dc2626;font-size:12px;">Defeito</span>'
+    : (u.data_proxima_preventiva && u.data_proxima_preventiva.slice(0,10) <= hojeISO ? '<span style="color:#ea580c;font-size:12px;">Preventiva vencida</span>'
+    : (u.data_validade_calibracao && u.data_validade_calibracao.slice(0,10) <= hojeISO ? '<span style="color:#d97706;font-size:12px;">Calibração vencida</span>' : ''));
     const filtradas = unidadesManutencaoCache.filter(u => { if (!f) return true; return (u.tag||'').toLowerCase().includes(f) || (u.produto_nome||'').toLowerCase().includes(f) || (u.numero_serie||'').toLowerCase().includes(f); });
     if (filtradas.length === 0) { listaDiv.innerHTML = '<div style="text-align: center; color: #9ca3af; padding: 24px;">Nenhuma unidade com defeito.</div>'; atualizarContadorManutencao(); return; }
     listaDiv.innerHTML = filtradas.map(u => `<label style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f3f4f6; cursor: pointer;"><input type="checkbox" class="manut-lote-check" value="${u.id}" onchange="atualizarContadorManutencao()"><div style="flex: 1;"><div style="font-weight: 600; font-size: 14px;">${u.tag||'Sem TAG'}</div><div style="font-size: 12px; color: #6b7280;">${u.produto_nome||'—'} • Série: ${u.numero_serie||'—'}</div></div><span style="font-size: 11px; padding: 3px 8px; border-radius: 8px; background: #fee2e2; color: #b91c1c;">com defeito</span></label>`).join('');

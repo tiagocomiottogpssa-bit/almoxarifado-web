@@ -1,6 +1,8 @@
 ﻿from datetime import datetime, timezone, timedelta, date
 hoje_iso = date.today().isoformat()
 hoje_mais_30_iso = (date.today() + timedelta(days=30)).isoformat()
+hoje_mais_60_iso = (date.today() + timedelta(days=60)).isoformat()
+DIAS_ALERTA_PREVENTIVA = 60
 from flask import Flask, request, jsonify
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, decode_token
 from flask_cors import CORS
@@ -1336,6 +1338,9 @@ def criar_unidade():
         'almoxarifado_id': data.get('almoxarifado_id'),
         'requer_calibracao': requer_calibracao,
         'data_validade_calibracao': data.get('data_validade_calibracao'),
+        'periodicidade_preventiva_dias': data.get('periodicidade_preventiva_dias'),
+        'data_ultima_preventiva': data.get('data_ultima_preventiva'),
+        'data_proxima_preventiva': data.get('data_proxima_preventiva'),
         'numero_certificado': data.get('numero_certificado'),
         'data_ultima_manutencao': data.get('data_ultima_manutencao'),
         'observacao': data.get('observacao'),
@@ -1350,6 +1355,13 @@ def criar_unidade():
                 f'INSERT INTO unidades ({colunas}) VALUES ({placeholders})',
                 tuple(valores.values())
             )
+
+            # Cálculo da próxima preventiva (se periodicidade definida e sem data manual)
+            if valores.get('periodicidade_preventiva_dias') and not valores.get('data_proxima_preventiva'):
+                periodicidade = int(valores['periodicidade_preventiva_dias'])
+                base = valores.get('data_ultima_preventiva') or hoje_iso
+                valores['data_proxima_preventiva'] = (date.fromisoformat(base[:10]) + timedelta(days=periodicidade)).isoformat()
+
             # Incrementa +1 no estoque do produto vinculado
             almoxarifado_id = valores.get('almoxarifado_id')
             if almoxarifado_id:
@@ -1406,6 +1418,9 @@ def atualizar_unidade(id):
         'almoxarifado_id': data.get('almoxarifado_id'),
         'requer_calibracao': requer_calibracao,
         'data_validade_calibracao': data.get('data_validade_calibracao'),
+        'periodicidade_preventiva_dias': data.get('periodicidade_preventiva_dias'),
+        'data_ultima_preventiva': data.get('data_ultima_preventiva'),
+        'data_proxima_preventiva': data.get('data_proxima_preventiva'),
         'numero_certificado': data.get('numero_certificado'),
         'data_ultima_manutencao': data.get('data_ultima_manutencao'),
         'observacao': data.get('observacao'),
@@ -1429,6 +1444,13 @@ def atualizar_unidade(id):
                         message=f'Unidade em "{atual["status"]}" não pode ter status alterado manualmente. Use o fluxo de manutenção.',
                         status_code=400
                     )
+
+                # Cálculo da próxima preventiva (se periodicidade definida e sem data manual)
+                if valores.get('periodicidade_preventiva_dias') and not valores.get('data_proxima_preventiva'):
+                    periodicidade = int(valores['periodicidade_preventiva_dias'])
+                    base = valores.get('data_ultima_preventiva') or hoje_iso
+                    valores['data_proxima_preventiva'] = (date.fromisoformat(base[:10]) + timedelta(days=periodicidade)).isoformat()
+                
                 # Valida transições manuais permitidas
                 transicoes_manuais = {
                     'disponivel': {'emprestado', 'com_defeito', 'em_manutencao'},
@@ -1607,6 +1629,13 @@ def retornar_manutencao_unidade(id):
                 (destino_id, now_iso(), now_iso(), id)
             )
 
+            # Recalcula próxima preventiva (retorno = nova base)
+            u_row = conn.execute('SELECT periodicidade_preventiva_dias FROM unidades WHERE id = ?', (id,)).fetchone()
+            if u_row and u_row['periodicidade_preventiva_dias']:
+                prox = (date.today() + timedelta(days=int(u_row['periodicidade_preventiva_dias']))).isoformat()
+                conn.execute('UPDATE unidades SET data_ultima_preventiva = ?, data_proxima_preventiva = ? WHERE id = ?',
+                             (hoje_iso[:10], prox, id))
+
             # Incrementa estoque no destino
             conn.execute(
                 '''INSERT INTO estoque (produto_id, almoxarifado_id, quantidade, estoque_minimo, updated_at)
@@ -1698,6 +1727,13 @@ def retornar_manutencao_lote():
                        WHERE id = ?''',
                     (destino_id, now_iso(), now_iso(), uid)
                 )
+
+                # Recalcula próxima preventiva (retorno = nova base)
+                u_row = conn.execute('SELECT periodicidade_preventiva_dias FROM unidades WHERE id = ?', (id,)).fetchone()
+                if u_row and u_row['periodicidade_preventiva_dias']:
+                    prox = (date.today() + timedelta(days=int(u_row['periodicidade_preventiva_dias']))).isoformat()
+                    conn.execute('UPDATE unidades SET data_ultima_preventiva = ?, data_proxima_preventiva = ? WHERE id = ?',
+                                (hoje_iso[:10], prox, id))
 
                 # Incrementa estoque no destino
                 conn.execute(
@@ -1959,7 +1995,7 @@ def enviar_unidades_manutencao_lote():
             doc_manut = f"Manut. Lote {now_iso()[:19]}"
             for uid in unidades_ids:
                 row = conn.execute(
-                    'SELECT tag, produto_id, almoxarifado_id, status FROM unidades WHERE id = ?', (uid,)
+                    'SELECT tag, produto_id, almoxarifado_id, status, data_proxima_preventiva, data_validade_calibracao FROM unidades WHERE id = ?', (uid,)
                 ).fetchone()
                 if not row:
                     erros.append(f'Unidade ID {uid} não encontrada.')
@@ -1967,8 +2003,12 @@ def enviar_unidades_manutencao_lote():
                 if row['status'] == 'em_manutencao':
                     erros.append(f'Unidade TAG {row["tag"]} já está em manutenção.')
                     continue
-                if row['status'] != 'com_defeito':
-                    erros.append(f'Unidade TAG {row["tag"]} precisa estar com defeito para envio à manutenção.')
+                # Motivos válidos: defeito OU preventiva/calibração vencida
+                hoje_10 = hoje_iso[:10]
+                motivo_preventiva = row['data_proxima_preventiva'] and row['data_proxima_preventiva'][:10] <= hoje_10
+                motivo_calibracao = row['data_validade_calibracao'] and row['data_validade_calibracao'][:10] <= hoje_10
+                if row['status'] != 'com_defeito' and not (motivo_preventiva or motivo_calibracao):
+                    erros.append(f'Unidade TAG {row["tag"]} sem motivo válido (defeito, preventiva ou calibração vencida).')
                     continue
                 produto_id = row['produto_id']
                 almoxarifado_origem_id = row['almoxarifado_id']
@@ -3512,6 +3552,33 @@ def dashboard():
                 ORDER BY u.data_validade_calibracao''',
                 (hoje_iso, hoje_mais_30_iso)
             ).fetchall()
+
+            # Calibrações a vencer (60 dias)
+            calib_60d = conn.execute(
+                '''SELECT COUNT(*) as total FROM unidades
+                   WHERE requer_calibracao = 1 AND data_validade_calibracao IS NOT NULL
+                     AND data_validade_calibracao >= ? AND data_validade_calibracao <= ?''',
+                (hoje_iso[:10], hoje_mais_60_iso)
+            ).fetchone()['total']
+
+            # Preventivas a vencer (60 dias)
+            prev_60d = conn.execute(
+                '''SELECT COUNT(*) as total FROM unidades
+                   WHERE periodicidade_preventiva_dias IS NOT NULL
+                     AND data_proxima_preventiva IS NOT NULL
+                     AND data_proxima_preventiva >= ? AND data_proxima_preventiva <= ?''',
+                (hoje_iso[:10], hoje_mais_60_iso)
+            ).fetchone()['total']
+
+            # Preventivas vencidas
+            prev_vencidas = conn.execute(
+                '''SELECT COUNT(*) as total FROM unidades
+                   WHERE periodicidade_preventiva_dias IS NOT NULL
+                     AND data_proxima_preventiva IS NOT NULL
+                     AND data_proxima_preventiva < ?''',
+                (hoje_iso[:10],)
+            ).fetchone()['total']
+
             # Valor do estoque de consumíveis (produtos que não controlam depreciação)
             valor_estoque_consumiveis = conn.execute(
                 '''SELECT COALESCE(SUM(e.quantidade * COALESCE(p.custo_medio, 0)), 0) as total
@@ -3635,6 +3702,9 @@ def dashboard():
             'gastos_por_tipo': rows_to_dict(gastos_por_tipo),
             'equipamentos_manutencao_lista': rows_to_dict(equipamentos_manutencao_lista),
             'calibracoes_lista': rows_to_dict(calibracoes_lista),
+            'preventivas_60d': prev_60d,
+            'preventivas_vencidas': prev_vencidas,
+            'calibracoes_60d': calib_60d,
             'valor_estoque_consumiveis': valor_estoque_consumiveis,
             'total_unidades_ativas': total_unidades_ativas,
             'valor_aquisicao_total': depreciacao_totais.get('valor_aquisicao_total', 0),

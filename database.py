@@ -223,7 +223,15 @@ def _migrate_produtos_sobressalente(conn):
         conn.execute("ALTER TABLE produtos ADD COLUMN sobressalente BOOLEAN DEFAULT FALSE")
         print("Migração: coluna 'sobressalente' adicionada à tabela produtos.")
 
-
+def _migrate_unidades_preventiva(conn):
+    """Adiciona campos de manutenção preventiva à tabela unidades (se não existirem)."""
+    if not _column_exists(conn, 'unidades', 'periodicidade_preventiva_dias'):
+        conn.execute("ALTER TABLE unidades ADD COLUMN periodicidade_preventiva_dias INTEGER")
+    if not _column_exists(conn, 'unidades', 'data_ultima_preventiva'):
+        conn.execute("ALTER TABLE unidades ADD COLUMN data_ultima_preventiva TEXT")
+    if not _column_exists(conn, 'unidades', 'data_proxima_preventiva'):
+        conn.execute("ALTER TABLE unidades ADD COLUMN data_proxima_preventiva TEXT")
+    conn.commit()
 
 def sql_dias_restantes(coluna):
     """Retorna expressao SQL para calcular dias restantes ate a data da coluna."""
@@ -267,6 +275,7 @@ def init_db():
             conn.execute("ALTER TABLE manutencoes_unidades DROP CONSTRAINT IF EXISTS manutencoes_unidades_status_check")
             conn.execute("ALTER TABLE manutencoes_unidades ADD CONSTRAINT manutencoes_unidades_status_check CHECK (status IN ('aguardando_envio', 'em_manutencao', 'concluida'))")    
         _migrate_unidades_depreciacao(conn)
+        _migrate_unidades_preventiva(conn)
         _migrate_produtos_depreciacao(conn)
         _migrate_produtos_sobressalente(conn) 
         _create_equipamentos(conn)
