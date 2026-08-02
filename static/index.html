@@ -1023,10 +1023,10 @@ th, td {
                 <table>
                     <thead>
                         <tr>
-                            <th style="width:140px; min-width:140px;">Nome</th>
-                            <th style="width:200px; min-width:200px;">E-mail</th>
-                            <th style="width:70px; min-width:70px;">Perfil</th>
-                            <th style="width:70px; min-width:70px;">Status</th>
+                            <th style="width:60px; min-width:60px;">ID</th>
+                            <th style="width:200px; min-width:200px;">Usuário</th>
+                            <th style="width:120px; min-width:120px;">Perfil</th>
+                            <th style="width:160px; min-width:160px;">Criado em</th>
                             <th style="width:60px; min-width:60px; text-align: center;">Ações</th>
                         </tr>
                     </thead>
@@ -2248,6 +2248,16 @@ async function init() {
     }
 }
 
+function formatarDataHora(valor) {
+    if (!valor) return '-';
+    let texto = String(valor).trim();
+    texto = texto.replace(' ', 'T'); // normaliza 'YYYY-MM-DD HH:MM:SS'
+    if (!/Z$|[+-]\d{2}:\d{2}$/.test(texto)) texto += 'Z'; // assume UTC se não tiver fuso
+    const d = new Date(texto);
+    if (isNaN(d.getTime())) return String(valor).slice(0, 16); // fallback seguro
+    return d.toLocaleString('pt-BR');
+}
+
 async function loadUsuarios() {
     const tbody = document.getElementById('usuariosTableBody');
     const totalSpan = document.getElementById('totalUsuarios');
@@ -2286,7 +2296,7 @@ async function loadUsuarios() {
                 <td>${user.id}</td>
                 <td>${user.username}</td>
                 <td>${user.perfil || 'operador'}</td>
-                <td>${user.created_at ? new Date(user.created_at + 'Z').toLocaleString('pt-BR') : '-'}</td>
+                <td>${formatarDataHora(user.created_at)}</td>
                 <td style="text-align: center; display: flex; gap: 8px; justify-content: center;">
                     <button class="btn-sm btn-edit" onclick="editarUsuario(${user.id})" title="Editar">✏️</button>
                     <button class="btn-sm btn-delete" onclick="excluirUsuario(${user.id})" title="Excluir">🗑️</button>

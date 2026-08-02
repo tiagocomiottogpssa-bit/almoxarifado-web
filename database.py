@@ -248,6 +248,23 @@ def sql_data_dentro_proximos_30_dias(coluna):
     else:
         return f"({coluna} >= DATE('now') AND {coluna} <= DATE('now', '+30 days'))"
 
+def _migrate_usuarios_perfil(conn):
+    """Atualiza a CHECK constraint de perfil para aceitar os 5 perfis (Postgres)."""
+    if USE_POSTGRES:
+        linhas = conn.execute("""
+            SELECT conname, pg_get_constraintdef(oid) AS def
+            FROM pg_constraint
+            WHERE conrelid = 'usuarios'::regclass AND contype = 'c'
+        """).fetchall()
+        for linha in linhas:
+            if 'perfil' in (linha['def'] or ''):
+                conn.execute(f'ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS "{linha["conname"]}"')
+        conn.execute("""
+            ALTER TABLE usuarios ADD CONSTRAINT usuarios_perfil_check
+            CHECK (perfil IN ('admin', 'supervisor', 'operador', 'comprador', 'visualizador'))
+        """)
+    conn.commit()
+
 def init_db():
     """Cria/atualiza todas as tabelas do banco."""
     with get_connection() as conn:
@@ -268,6 +285,7 @@ def init_db():
         _migrate_produtos_sobressalente(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)
+        _migrate_usuarios_perfil(conn)
         # Migração: adiciona almoxarifado_origem_id se não existir
         if not _column_exists(conn, 'manutencoes_unidades', 'almoxarifado_origem_id'):
             conn.execute("ALTER TABLE manutencoes_unidades ADD COLUMN almoxarifado_origem_id INTEGER")
