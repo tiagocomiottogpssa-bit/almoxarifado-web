@@ -187,7 +187,7 @@ th, td {
     <!-- Sidebar fixa à esquerda -->
     <div class="sidebar">
         <div class="sidebar-header">📦 Sistema de Almoxarifado</div>
-        <button class="btn-secondary" onclick="abrirModalAlterarSenha()" style="margin-left:auto;">🔑 Alterar Senha</button>
+        <button class="sidebar-item" onclick="abrirModalAlterarSenha()" style="margin-left:auto;">🔑 Alterar Senha</button>
         <div class="sidebar-nav">
             <button class="sidebar-item active" data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
             <button class="sidebar-item" data-tab="movimentacoes" onclick="showTab('movimentacoes')">🔄 Movimentações</button>
@@ -2195,8 +2195,6 @@ async function login() {
         localStorage.setItem('user_perfil', data.data.perfil);
         localStorage.setItem('user_nome', data.data.username);
         localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
-        localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
-        localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
         showMessage('auth-message', data.msg || 'Login realizado', 'success');
         initApp();
         if (data.data.trocar_senha) {
@@ -2204,9 +2202,6 @@ async function login() {
         } else {
             showTab('dashboard');
         }
-        showMessage('auth-message', data.msg || 'Login realizado', 'success');
-        initApp();
-        showTab('dashboard');
     } catch (err) {
         showMessage('auth-message', 'Erro de conexão: ' + err.message, 'error');
     }
