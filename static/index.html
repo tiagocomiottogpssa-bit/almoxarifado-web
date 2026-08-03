@@ -170,7 +170,6 @@ th, td {
                     <label for="username">Usuário</label>
                     <input type="text" id="username" name="username" required>
                 </div>
-                <button class="btn-secondary" onclick="abrirModalAlterarSenha()" style="margin-left:auto;">🔑 Alterar Senha</button>
                 <div class="form-group">
                     <label for="password">Senha</label>
                     <input type="password" id="password" name="password" required>
@@ -187,6 +186,7 @@ th, td {
     <!-- Sidebar fixa à esquerda -->
     <div class="sidebar">
         <div class="sidebar-header">📦 Sistema de Almoxarifado</div>
+        <button class="btn-secondary" onclick="abrirModalAlterarSenha()" style="margin-left:auto;">🔑 Alterar Senha</button>
         <div class="sidebar-nav">
             <button class="sidebar-item active" data-tab="produtos" onclick="showTab('produtos')">📦 Produtos</button>
             <button class="sidebar-item" data-tab="movimentacoes" onclick="showTab('movimentacoes')">🔄 Movimentações</button>
@@ -2194,13 +2194,17 @@ async function login() {
         localStorage.setItem('user_perfil', data.data.perfil);
         localStorage.setItem('user_nome', data.data.username);
         localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
+        localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
         if (data.data.trocar_senha) {
-            abrirModalAlterarSenha();   // obriga a troca antes de liberar o sistema
-        } else {
-            showTab('dashboard');
+            // Primeiro acesso: bloqueia o app e abre o modal de troca
+            document.getElementById('app-section').classList.add('hidden');
+            document.getElementById('auth-section').classList.remove('hidden');
+            abrirModalAlterarSenha();
+            return;   // não carrega o app nem navega até trocar
         }
         showMessage('auth-message', data.msg || 'Login realizado', 'success');
         initApp();
+        showTab('dashboard');
     } catch (err) {
         showMessage('auth-message', 'Erro de conexão: ' + err.message, 'error');
     }
