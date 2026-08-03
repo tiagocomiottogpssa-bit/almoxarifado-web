@@ -141,8 +141,8 @@ def registro():
                 return response(False, message='Username já existe.', status_code=409)
 
             conn.execute(
-                'INSERT INTO usuarios (username, password, perfil, created_at) VALUES (?, ?, ?, ?)',
-                (username, generate_password_hash(password), perfil, now_iso())
+                'INSERT INTO usuarios (username, password, perfil, trocar_senha, created_at) VALUES (?, ?, ?, ?, ?)',
+                (username, generate_password_hash(password), perfil, 1, now_iso())
             )
             conn.commit()
 
@@ -303,11 +303,44 @@ def login():
             'access_token': access_token,
             'perfil': row['perfil'] if 'perfil' in row.keys() else 'admin',
             'usuario_id': row['id'],
-            'username': row['username']
+            'username': row['username'],
+            'trocar_senha': bool(row['trocar_senha']) if 'trocar_senha' in row.keys() else False
         })
+       
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
+@app.route('/alterar-senha', methods=['POST'])
+@jwt_required()
+def alterar_senha():
+    try:
+        data = request.get_json() or {}
+        senha_atual = data.get('senha_atual', '')
+        nova_senha = data.get('nova_senha', '')
+        confirmar_senha = data.get('confirmar_senha', '')
+
+        if not senha_atual or not nova_senha:
+            return response(False, message='Senha atual e nova senha são obrigatórias.', status_code=400)
+        if len(nova_senha) < 6:
+            return response(False, message='A nova senha deve ter pelo menos 6 caracteres.', status_code=400)
+        if nova_senha != confirmar_senha:
+            return response(False, message='A confirmação não confere com a nova senha.', status_code=400)
+
+        current_user = get_jwt_identity()
+        with get_connection() as conn:
+            user = conn.execute('SELECT id, password FROM usuarios WHERE username = ?', (current_user,)).fetchone()
+            if not user:
+                return response(False, message='Usuário não encontrado.', status_code=404)
+            if not check_password_hash(user['password'], senha_atual):
+                return response(False, message='Senha atual incorreta.', status_code=401)
+
+            conn.execute('UPDATE usuarios SET password = ? WHERE id = ?',
+                         (generate_password_hash(nova_senha), user['id']))
+            conn.commit()
+            registrar_log(user['id'], current_user, 'alterar', 'usuarios', 'Alterou a própria senha')
+        return response(True, message='Senha alterada com sucesso.')
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
 
 # ============================================================
 # PRODUTOS

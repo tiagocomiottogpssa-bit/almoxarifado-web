@@ -265,6 +265,12 @@ def _migrate_usuarios_perfil(conn):
         """)
     conn.commit()
 
+def _migrate_usuarios_trocar_senha(conn):
+    """Adiciona flag de troca de senha obrigatoria no primeiro acesso."""
+    if not _column_exists(conn, 'usuarios', 'trocar_senha'):
+        conn.execute("ALTER TABLE usuarios ADD COLUMN trocar_senha INTEGER DEFAULT 0")
+    conn.commit()
+
 def init_db():
     """Cria/atualiza todas as tabelas do banco."""
     with get_connection() as conn:
@@ -283,6 +289,7 @@ def init_db():
         _migrate_produtos_natureza(conn)
         _migrate_movimentacoes_checkout(conn)
         _migrate_produtos_sobressalente(conn)
+        _migrate_usuarios_trocar_senha(conn)
         _create_unidades(conn)
         _create_manutencoes_unidades(conn)
         _migrate_usuarios_perfil(conn)

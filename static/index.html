@@ -170,6 +170,7 @@ th, td {
                     <label for="username">Usuário</label>
                     <input type="text" id="username" name="username" required>
                 </div>
+                <button class="btn-secondary" onclick="abrirModalAlterarSenha()" style="margin-left:auto;">🔑 Alterar Senha</button>
                 <div class="form-group">
                     <label for="password">Senha</label>
                     <input type="password" id="password" name="password" required>
@@ -2192,6 +2193,12 @@ async function login() {
         localStorage.setItem('access_token', data.data.access_token);
         localStorage.setItem('user_perfil', data.data.perfil);
         localStorage.setItem('user_nome', data.data.username);
+        localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
+        if (data.data.trocar_senha) {
+            abrirModalAlterarSenha();   // obriga a troca antes de liberar o sistema
+        } else {
+            showTab('dashboard');
+        }
         showMessage('auth-message', data.msg || 'Login realizado', 'success');
         initApp();
     } catch (err) {
@@ -2453,6 +2460,46 @@ async function atualizarUsuario(id) {
         showMessage('usuarios-message', 'Usuário atualizado com sucesso!', 'success');
         limparFormUsuario();
         loadUsuarios();
+    } catch (err) {
+        showMessage('usuarios-message', 'Erro de conexão: ' + err.message, 'error');
+    }
+}
+
+function abrirModalAlterarSenha() {
+    document.getElementById('modalAlterarSenha').style.display = 'flex';
+    document.getElementById('senha_atual').value = '';
+    document.getElementById('nova_senha').value = '';
+    document.getElementById('confirmar_senha').value = '';
+    document.getElementById('senha_atual').focus();
+}
+
+function fecharModalAlterarSenha() {
+    document.getElementById('modalAlterarSenha').style.display = 'none';
+}
+
+async function submitAlterarSenha(event) {
+    event.preventDefault();
+    const senha_atual = document.getElementById('senha_atual').value;
+    const nova_senha = document.getElementById('nova_senha').value;
+    const confirmar_senha = document.getElementById('confirmar_senha').value;
+    if (nova_senha !== confirmar_senha) {
+        showMessage('usuarios-message', 'A confirmação não confere com a nova senha.', 'error');
+        return;
+    }
+    try {
+        const res = await fetch(`${API_BASE}/alterar-senha`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('access_token') },
+            body: JSON.stringify({ senha_atual, nova_senha, confirmar_senha })
+        });
+        const data = await res.json();
+        if (!data.success) {
+            showMessage('usuarios-message', data.msg || 'Erro ao alterar senha', 'error');
+            return;
+        }
+        showMessage('usuarios-message', 'Senha alterada com sucesso!', 'success');
+        fecharModalAlterarSenha();
+        localStorage.setItem('trocar_senha', '0');
     } catch (err) {
         showMessage('usuarios-message', 'Erro de conexão: ' + err.message, 'error');
     }
@@ -5611,6 +5658,30 @@ window.addEventListener('load', init);
             <button type="button" class="btn-secondary" onclick="fecharModal('modal-transferir-pedido')">Cancelar</button>
             <button type="button" class="btn-primary" id="btn-confirmar-transferencia" onclick="confirmarTransferencia()" style="background:#f59e0b;">Confirmar Transferência</button>
         </div>
+    </div>
+</div>
+
+<div id="modalAlterarSenha" class="modal" style="display:none;">
+    <div class="modal-content">
+        <h3>🔑 Alterar Senha</h3>
+        <form id="alterarSenhaForm" onsubmit="return submitAlterarSenha(event)">
+            <div class="form-group">
+                <label>Senha atual</label>
+                <input type="password" id="senha_atual" required>
+            </div>
+            <div class="form-group">
+                <label>Nova senha</label>
+                <input type="password" id="nova_senha" required>
+            </div>
+            <div class="form-group">
+                <label>Confirmar nova senha</label>
+                <input type="password" id="confirmar_senha" required>
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+                <button type="submit" class="btn-primary">Salvar</button>
+                <button type="button" class="btn-secondary" onclick="fecharModalAlterarSenha()">Cancelar</button>
+            </div>
+        </form>
     </div>
 </div>
 
