@@ -334,7 +334,7 @@ def alterar_senha():
             if not check_password_hash(user['password'], senha_atual):
                 return response(False, message='Senha atual incorreta.', status_code=401)
 
-            conn.execute('UPDATE usuarios SET password = ? WHERE id = ?',
+            conn.execute('UPDATE usuarios SET password = ?, trocar_senha = 0 WHERE id = ?',
                          (generate_password_hash(nova_senha), user['id']))
             conn.commit()
             registrar_log(user['id'], current_user, 'alterar', 'usuarios', 'Alterou a própria senha')

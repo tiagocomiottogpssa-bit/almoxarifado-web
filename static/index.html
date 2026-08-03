@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestão de Produtos</title>
@@ -2195,12 +2196,13 @@ async function login() {
         localStorage.setItem('user_nome', data.data.username);
         localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
         localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
+        localStorage.setItem('trocar_senha', data.data.trocar_senha ? '1' : '0');
+        showMessage('auth-message', data.msg || 'Login realizado', 'success');
+        initApp();
         if (data.data.trocar_senha) {
-            // Primeiro acesso: bloqueia o app e abre o modal de troca
-            document.getElementById('app-section').classList.add('hidden');
-            document.getElementById('auth-section').classList.remove('hidden');
-            abrirModalAlterarSenha();
-            return;   // não carrega o app nem navega até trocar
+            abrirModalAlterarSenha();   // abre sobre a página principal, bloqueando a navegação
+        } else {
+            showTab('dashboard');
         }
         showMessage('auth-message', data.msg || 'Login realizado', 'success');
         initApp();
