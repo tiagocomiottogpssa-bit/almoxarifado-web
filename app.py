@@ -386,6 +386,7 @@ def listar_produtos():
             ''', params + [por_pagina, offset]).fetchall()
 
         total_paginas = (total + por_pagina - 1) // por_pagina
+        print("listar_produtos OK - total:", total, "pagina:", pagina)
         return response(True, data={
             'items': rows_to_dict(rows),
             'total': total,
@@ -394,6 +395,7 @@ def listar_produtos():
             'total_paginas': total_paginas
         })
     except Exception as e:
+        print("ERRO em listar_produtos:", e)
         return response(False, message=str(e), status_code=500)
 
 @app.route('/produtos/exportar', methods=['GET'])
