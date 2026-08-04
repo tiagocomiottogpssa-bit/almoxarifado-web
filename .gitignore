@@ -1,4 +1,45 @@
-venv/
+# Python
 __pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Ambientes virtuais
+venv/
+.venv/
+env/
+ENV/
+
+# Bancos locais e dados de teste
 *.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+instance/
+
+# Logs, temporários e SO
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# Caches de ferramentas
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Credenciais (NUNCA commitar)
 .env
+.env.*
+
+# Editores
+.vscode/
+.idea/
