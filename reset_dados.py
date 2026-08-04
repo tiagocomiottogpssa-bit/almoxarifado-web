@@ -9,7 +9,7 @@ import datetime
 import os
 
 # Ajuste para o nome do seu banco local (confirme na raiz do projeto)
-DB_PATH = 'almoxarifado.db'
+DB_PATH = os.environ.get('DB_PATH', os.path.join(os.path.dirname(__file__), 'sistema.db'))
 
 def backup():
     """Cria uma cópia do banco antes de qualquer alteração."""
