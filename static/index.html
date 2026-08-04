@@ -1746,12 +1746,12 @@ function authHeadersJSON() {
 function exportarProdutos() {
     const token = localStorage.getItem('access_token');
     
-    fetch(`${API_BASE}/produtos`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+    fetch(`${API_BASE}/produtos/exportar`, {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
     })
         .then(res => res.json())
         .then(data => {
-            const produtos = data.data || data; 
+            const produtos = (data.data && data.data.items) || data.data || data || []; 
             
             if (!produtos || !produtos.length) {
                 alert('Nenhum produto cadastrado para exportar.');
@@ -1903,7 +1903,8 @@ async function carregarDashboard() {
         const resProd = await fetch(`${API_BASE}/produtos`, { headers });
         const produtos = await resProd.json();
         const prodMap = {};
-        (produtos.data || produtos).forEach(p => prodMap[p.id] = p);
+        const listaProdutos = (produtos.data && produtos.data.items) || produtos.data || produtos || [];
+        listaProdutos.forEach(p => prodMap[p.id] = p);
 
         // 3. Busca colaboradores
         const resCol = await fetch(`${API_BASE}/colaboradores`, { headers });
@@ -1947,7 +1948,7 @@ async function carregarDashboard() {
             else if (m.tipo === 'saida') saldos[m.produto_id] -= m.quantidade;
         });
         let estoqueCritico = 0;
-        (produtos.data || produtos).forEach(p => {
+        ((produtos.data && produtos.data.items) || produtos.data || produtos || []).forEach(p => {
             const qtd = saldos[p.id] || 0;
             const min = p.estoque_minimo || 0;
             if (qtd < min) estoqueCritico++;

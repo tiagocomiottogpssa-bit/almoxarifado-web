@@ -396,6 +396,21 @@ def listar_produtos():
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
+@app.route('/produtos/exportar', methods=['GET'])
+@jwt_required()
+def exportar_produtos():
+    try:
+        with get_connection() as conn:
+            rows = conn.execute('''
+                SELECT p.*, a.nome as almoxarifado_nome,
+                    COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
+                FROM produtos p
+                LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
+                ORDER BY p.nome
+            ''').fetchall()
+        return response(True, data=rows_to_dict(rows))
+    except Exception as e:
+        return response(False, message=str(e), status_code=500)
 
 @app.route('/produtos', methods=['POST'])
 @jwt_required()
