@@ -282,6 +282,14 @@ th, td {
         </form>
     </div>
 
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+        <input type="text" id="produtosBuscaInput" placeholder="Buscar por nome, código interno ou fabricante..." 
+            style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;"
+            onkeydown="if(event.key === 'Enter'){ produtosBusca = this.value; produtosPaginaAtual = 1; renderProdutos(); }">
+        <button class="btn-sm" onclick="produtosBusca = document.getElementById('produtosBuscaInput').value; produtosPaginaAtual = 1; renderProdutos();">🔍 Buscar</button>
+        <button class="btn-sm" onclick="document.getElementById('produtosBuscaInput').value=''; produtosBusca=''; produtosPaginaAtual=1; renderProdutos();">Limpar</button>
+    </div>
+
     <!-- Tabela de Produtos -->
     <div class="card" style="margin-top: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
@@ -3285,39 +3293,44 @@ function submitProduto(event) {
     return false;
 }
 
+let produtosPaginaAtual = 1;
+let produtosTotalPaginas = 1;
+let produtosBusca = '';
+
 function renderProdutos() {
-    fetch(`${API_BASE}/produtos`, { 
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    fetch(`${API_BASE}/produtos?pagina=${produtosPaginaAtual}&por_pagina=50&busca=${encodeURIComponent(produtosBusca)}`, {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
     })
     .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         return res.json();
     })
     .then(data => {
         const tbody = document.getElementById('produtosTableBody');
         tbody.innerHTML = '';
-        
-        // O novo backend retorna { success: true, data: [...] }
-        const produtos = data.data || data || [];
-        
+
+        // Novo formato: { success: true, data: { items, total, pagina, total_paginas } }
+        const payload = data.data || {};
+        const produtos = payload.items || [];
+        produtosTotalPaginas = payload.total_paginas || 1;
+        const total = payload.total || 0;
+
         if (produtos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #9ca3af; padding: 30px;">Nenhum produto cadastrado ainda.</td></tr>';
             document.getElementById('totalProdutos').textContent = '0 registros';
+            atualizarControlesPaginacao();
             return;
         }
-
-        document.getElementById('totalProdutos').textContent = `${produtos.length} registro(s)`;
-
+        document.getElementById('totalProdutos').textContent = total + ' registro(s)';
         produtos.forEach(p => {
             const rastreioLabel = {
                 'nenhum': '—',
                 'lote': 'Lote',
                 'calibracao': 'Calibração'
             }[p.rastreabilidade] || p.rastreabilidade || '—';
-
             tbody.innerHTML += `
                 <tr>
-                    <td style="text-align:center;"><input type="checkbox" class="sel-etiqueta" value="${p.id}" style="cursor:pointer;"></td> 
+                    <td style="text-align:center;"><input type="checkbox" class="sel-etiqueta" value="${p.id}" style="cursor:pointer;"></td>
                     <td>${p.codigo_interno || '-'}</td>
                     <td><strong>${p.nome}</strong></td>
                     <td>${p.rastreabilidade || '-'}</td>
@@ -3332,12 +3345,33 @@ function renderProdutos() {
                 </tr>
             `;
         });
+        atualizarControlesPaginacao();
     })
     .catch(err => {
         console.error('Erro ao renderizar produtos:', err);
-        document.getElementById('produtosTableBody').innerHTML = 
+        document.getElementById('produtosTableBody').innerHTML =
             '<tr><td colspan="8" style="text-align: center; color: #dc2626; padding: 30px;">Erro ao carregar produtos.</td></tr>';
     });
+}
+
+function atualizarControlesPaginacao() {
+    let el = document.getElementById('produtosPaginacao');
+    if (!el) {
+        const tbody = document.getElementById('produtosTableBody');
+        const table = tbody.closest('table');
+        if (!table) return;
+        el = document.createElement('div');
+        el.id = 'produtosPaginacao';
+        el.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap;';
+        table.after(el);
+    }
+    el.innerHTML = `
+        <span style="color:#6b7280;font-size:13px;">Página ${produtosPaginaAtual} de ${produtosTotalPaginas}</span>
+        <div style="display:flex;gap:8px;">
+            <button onclick="produtosPaginaAtual = Math.max(1, produtosPaginaAtual - 1); renderProdutos();" class="btn-sm" ${produtosPaginaAtual <= 1 ? 'disabled' : ''}>← Anterior</button>
+            <button onclick="produtosPaginaAtual = Math.min(produtosTotalPaginas, produtosPaginaAtual + 1); renderProdutos();" class="btn-sm" ${produtosPaginaAtual >= produtosTotalPaginas ? 'disabled' : ''}>Próxima →</button>
+        </div>
+    `;
 }
 
 function editarProduto(id) {
@@ -3345,7 +3379,7 @@ function editarProduto(id) {
         .then(res => res.json())
         .then(data => {
             // O novo backend retorna { success: true, data: [...] }
-            const produtos = data.data || data || [];
+            const produtos = (data.data && data.data.items) || data.data || data || [];
             const p = produtos.find(item => item.id === id);
             if (!p) return;
             
@@ -3412,7 +3446,7 @@ function loadProdutosSelect() {
         .then(res => res.json())
         .then(data => {
             const select = document.getElementById('produto_id');
-            const produtos = data.data || data || [];
+            const produtos = (data.data && data.data.items) || data.data || data || [];
             
             select.innerHTML = '<option value="">Selecione um produto</option>';
             produtos.forEach(p => {
@@ -3461,7 +3495,7 @@ function loadProdutosSelectUnidades() {
     })
     .then(res => res.json())
     .then(data => {
-        const produtos = data.data || data || [];
+        const produtos = (data.data && data.data.items) || data.data || data || [];
         select.innerHTML = '<option value="">Selecione um produto</option>';
         produtos.forEach(p => {
             select.innerHTML += `<option value="${p.id}">${p.nome}</option>`;
@@ -5039,7 +5073,7 @@ async function carregarProdutosParaPedido() {
         const res = await fetch(API_BASE + '/produtos', { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
         const data = await res.json();
-        const produtos = data.data || data || [];
+        const produtos = (data.data && data.data.items) || data.data || data || [];
         const select = document.getElementById('item_produto');
         select.innerHTML = '<option value="">Selecione...</option>';
 

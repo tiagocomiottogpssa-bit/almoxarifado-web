@@ -350,12 +350,31 @@ def alterar_senha():
 @jwt_required()
 def listar_produtos():
     try:
+        pagina = request.args.get('pagina', 1, type=int)
+        por_pagina = request.args.get('por_pagina', 50, type=int)
+        busca = request.args.get('busca', '').strip()
+        if pagina < 1:
+            pagina = 1
+        if por_pagina < 1 or por_pagina > 200:
+            por_pagina = 50
+        offset = (pagina - 1) * por_pagina
+
         with get_connection() as conn:
-            rows = conn.execute('''
+            where = ''
+            params = []
+            if busca:
+                where = "WHERE p.nome LIKE ? OR p.codigo_interno LIKE ? OR p.codigo_fabricante LIKE ?"
+                like = f'%{busca}%'
+                params = [like, like, like]
+
+            total = conn.execute(f"SELECT COUNT(*) FROM produtos p {where}", params).fetchone()[0]
+
+            rows = conn.execute(f'''
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
+                {where}
                 ORDER BY
                     CASE
                         WHEN COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) <= 0 THEN 0
@@ -363,8 +382,17 @@ def listar_produtos():
                         ELSE 2
                     END,
                     p.nome
-            ''').fetchall()
-        return response(True, data=rows_to_dict(rows))
+                LIMIT ? OFFSET ?
+            ''', params + [por_pagina, offset]).fetchall()
+
+        total_paginas = (total + por_pagina - 1) // por_pagina
+        return response(True, data={
+            'items': rows_to_dict(rows),
+            'total': total,
+            'pagina': pagina,
+            'por_pagina': por_pagina,
+            'total_paginas': total_paginas
+        })
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
