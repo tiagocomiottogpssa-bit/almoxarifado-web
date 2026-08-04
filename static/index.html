@@ -801,6 +801,25 @@ th, td {
                 </div>
             </form>
 
+            <!-- Filtro de Empréstimos -->
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; padding:12px; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px;">
+                <div style="flex:1; min-width:220px;">
+                    <label style="font-size:13px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">👤 Colaborador</label>
+                    <input type="text" id="filtro_emprestimo_colaborador" placeholder="Digite o nome do colaborador..." oninput="aplicarFiltroEmprestimos()" style="width:100%; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px;">
+                </div>
+                <div style="min-width:170px;">
+                    <label style="font-size:13px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📌 Status</label>
+                    <select id="filtro_emprestimo_status" onchange="aplicarFiltroEmprestimos()" style="width:100%; padding:8px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; background:#fff;">
+                        <option value="">Todos</option>
+                        <option value="ativo">🟢 Emprestado</option>
+                        <option value="devolvido">🔵 Devolvido</option>
+                        <option value="manutencao">🟡 Em Manutenção</option>
+                    </select>
+                </div>
+                <button type="button" class="btn-secondary" style="font-size:13px; padding:8px 14px;" onclick="limparFiltroEmprestimos()">🧹 Limpar filtro</button>
+            </div>
+            <div id="emprestimo-resumo" style="margin-bottom:8px; min-height:20px;"></div>
+
             <!-- Histórico de Empréstimos -->
             <div style="margin-top: 28px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -4491,31 +4510,71 @@ function loadEmprestimos() {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
     })
     .then(res => res.json())
-    .then(data => {
-        const tbody = document.getElementById('tabela-emprestimos-body');
-        if (!tbody) return;
-        
-        if (!data.success || !data.data || data.data.length === 0) {
-            tbody.innerHTML = `<tr>
-                <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">
-                    Nenhum empréstimo registrado.
-                </td>
-            </tr>`;
-            return;
-        }
-        
-        tbody.innerHTML = data.data.map(e => `
-            <tr>
-                <td><strong>${e.tag || '-'}</strong></td>
-                <td>${e.produto_nome || '-'}</td>
-                <td>${e.colaborador_nome || '-'}</td>
-                <td>${e.data_emprestimo ? new Date(e.data_emprestimo).toLocaleDateString('pt-BR') : '-'}</td>
-                <td>${renderStatusEmprestimo(e.status)}</td>
-            </tr>
-        `).join('');
+        .then(data => {
+        window.emprestimosAll = (data.success && data.data) ? data.data : [];
+        aplicarFiltroEmprestimos();
     })
-    .catch(err => console.error('Erro ao carregar empréstimos:', err));
+    .catch(err => {
+        console.error('Erro ao carregar empréstimos:', err);
+        window.emprestimosAll = [];
+        aplicarFiltroEmprestimos();
+    });
 }
+
+// Aplica o filtro de colaborador e status sobre os empréstimos carregados
+function aplicarFiltroEmprestimos() {
+    const termo = (document.getElementById('filtro_emprestimo_colaborador').value || '').toLowerCase().trim();
+    const status = document.getElementById('filtro_emprestimo_status').value;
+    const lista = (window.emprestimosAll || []).filter(e => {
+        const nome = (e.colaborador_nome || '').toLowerCase();
+        const okNome = !termo || nome.includes(termo);
+        const okStatus = !status || e.status === status;
+        return okNome && okStatus;
+    });
+    renderTabelaEmprestimos(lista);
+    atualizarResumoEmprestimos(lista);
+}
+
+// Renderiza a tabela a partir de uma lista filtrada
+function renderTabelaEmprestimos(lista) {
+    const tbody = document.getElementById('tabela-emprestimos-body');
+    if (!tbody) return;
+    if (!lista || lista.length === 0) {
+        tbody.innerHTML = `<tr>
+            <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">
+                Nenhum empréstimo encontrado com os filtros atuais.
+            </td>
+        </tr>`;
+        return;
+    }
+    tbody.innerHTML = lista.map(e => `
+        <tr>
+            <td><strong>${e.tag || '-'}</strong></td>
+            <td>${e.produto_nome || '-'}</td>
+            <td>${e.colaborador_nome || '-'}</td>
+            <td>${e.data_emprestimo ? new Date(e.data_emprestimo).toLocaleDateString('pt-BR') : '-'}</td>
+            <td>${renderStatusEmprestimo(e.status)}</td>
+        </tr>
+    `).join('');
+}
+
+// Atualiza o resumo com a contagem do que está em aberto
+function atualizarResumoEmprestimos(lista) {
+    const el = document.getElementById('emprestimo-resumo');
+    if (!el) return;
+    const ativos = lista.filter(e => e.status === 'ativo').length;
+    const manutencao = lista.filter(e => e.status === 'manutencao').length;
+    el.innerHTML = `<span style="font-size:13px; color:#374151; font-weight:600;">📊 ${lista.length} registro(s) — 🟢 ${ativos} emprestado(s)${manutencao ? ' — 🟡 ' + manutencao + ' em manutenção' : ''}</span>`;
+}
+
+// Limpa os filtros e mostra tudo
+function limparFiltroEmprestimos() {
+    document.getElementById('filtro_emprestimo_colaborador').value = '';
+    document.getElementById('filtro_emprestimo_status').value = '';
+    renderTabelaEmprestimos(window.emprestimosAll || []);
+    atualizarResumoEmprestimos(window.emprestimosAll || []);
+}
+
 
 // Renderiza o status do empréstimo
 function renderStatusEmprestimo(status) {
