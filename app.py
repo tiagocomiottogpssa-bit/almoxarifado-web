@@ -365,23 +365,25 @@ def listar_produtos():
                 b = busca.replace("'", "''")
                 where = f"WHERE p.nome LIKE '%{b}%' OR p.codigo_interno LIKE '%{b}%' OR p.codigo_fabricante LIKE '%{b}%'"
 
-            sql_count = "SELECT COUNT(*) FROM produtos p " + where
-            total = conn.execute(sql_count).fetchone()[0]
-
+            # Carrega TODOS os produtos (sem LIMIT/OFFSET no SQL)
             sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
-            """ + where + f"""
+            """ + where + """
                 ORDER BY p.nome
-                LIMIT {por_pagina} OFFSET {offset}
             """
             rows = conn.execute(sql).fetchall()
 
+            # Conta no Python (evita o fetchone()[0] que quebra no Postgres)
+            total = len(rows)
+            # Pagina manualmente no Python
+            pagina_rows = rows[offset:offset + por_pagina]
+
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
-            'items': rows_to_dict(rows),
+            'items': rows_to_dict(pagina_rows),
             'total': total,
             'pagina': pagina,
             'por_pagina': por_pagina,
