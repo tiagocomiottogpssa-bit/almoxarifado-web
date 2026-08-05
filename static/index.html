@@ -285,6 +285,7 @@ th, td {
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
         <input type="text" id="produtosBuscaInput" placeholder="Buscar por nome, código interno ou fabricante..." 
             style="flex:1;min-width:200px;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;"
+            oninput="produtosBusca = this.value; produtosPaginaAtual = 1; buscarProdutosDebounce();"
             onkeydown="if(event.key === 'Enter'){ produtosBusca = this.value; produtosPaginaAtual = 1; renderProdutos(); }">
         <button class="btn-sm" onclick="produtosBusca = document.getElementById('produtosBuscaInput').value; produtosPaginaAtual = 1; renderProdutos();">🔍 Buscar</button>
         <button class="btn-sm" onclick="document.getElementById('produtosBuscaInput').value=''; produtosBusca=''; produtosPaginaAtual=1; renderProdutos();">Limpar</button>
@@ -3297,6 +3298,16 @@ function submitProduto(event) {
 let produtosPaginaAtual = 1;
 let produtosTotalPaginas = 1;
 let produtosBusca = '';
+
+let produtosBuscaTimer = null;
+
+function buscarProdutosDebounce() {
+    // Debounce: espera 350ms após a última tecla antes de buscar
+    clearTimeout(produtosBuscaTimer);
+    produtosBuscaTimer = setTimeout(() => {
+        renderProdutos();
+    }, 350);
+}
 
 function renderProdutos() {
     fetch(`${API_BASE}/produtos?pagina=${produtosPaginaAtual}&por_pagina=50&busca=${encodeURIComponent(produtosBusca)}`, {
