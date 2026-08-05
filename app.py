@@ -359,19 +359,17 @@ def listar_produtos():
         offset = (pagina - 1) * por_pagina
 
         with get_connection() as conn:
-            # COUNT total — SQL mais simples possível, SEM params, SEM where
-            total = conn.execute("SELECT COUNT(*) FROM produtos").fetchone()[0]
-
-            # Página atual — SQL mais simples, SEM params, SEM where, SEM ORDER BY complexo
-            sql = """
+            # Pega TODOS os ids (só para contar) — ou usa len() se retornar lista
+            rows = conn.execute("""
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
                 ORDER BY p.nome
-                LIMIT {por_pagina} OFFSET {offset}
-            """
-            rows = conn.execute(sql).fetchall()
+            """).fetchall()
+            total = len(rows)   # ← conta no Python, evita o fetchone()[0]
+            # Pagina manualmente no Python
+            pagina_rows = rows[offset:offset + por_pagina]
 
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
