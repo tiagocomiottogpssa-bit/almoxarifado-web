@@ -363,9 +363,12 @@ def listar_produtos():
             where = ''
             if busca:
                 b = busca.replace("'", "''")
-                where = f"WHERE p.nome LIKE '%{b}%' OR p.codigo_interno LIKE '%{b}%' OR p.codigo_fabricante LIKE '%{b}%'"
+                # ILIKE = ignora maiúsculas/minúsculas
+                # unaccent = ignora acentos
+                where = f"""WHERE unaccent(p.nome) ILIKE unaccent('%{b}%')
+                    OR unaccent(p.codigo_interno) ILIKE unaccent('%{b}%')
+                    OR unaccent(p.codigo_fabricante) ILIKE unaccent('%{b}%')"""
 
-            # Carrega TODOS os produtos (sem LIMIT/OFFSET no SQL)
             sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
@@ -376,9 +379,7 @@ def listar_produtos():
             """
             rows = conn.execute(sql).fetchall()
 
-            # Conta no Python (evita o fetchone()[0] que quebra no Postgres)
             total = len(rows)
-            # Pagina manualmente no Python
             pagina_rows = rows[offset:offset + por_pagina]
 
         total_paginas = (total + por_pagina - 1) // por_pagina
