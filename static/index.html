@@ -2271,7 +2271,7 @@ async function init() {
         return;
     }
     try {
-        const res = await fetch(`${API_BASE}/produtos`, { headers: authHeaders() });
+        const res = await fetch(`${API_BASE}/produtos?por_pagina=200`, { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) {
             logout();
             showMessage('auth-message', 'Sessão expirada. Faça login novamente.', 'error');
@@ -3376,7 +3376,7 @@ function atualizarControlesPaginacao() {
 }
 
 function editarProduto(id) {
-    fetch(`${API_BASE}/produtos`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }})
+    fetch(`${API_BASE}/produtos?por_pagina=200`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }})
         .then(res => res.json())
         .then(data => {
             // O novo backend retorna { success: true, data: [...] }
@@ -3427,7 +3427,7 @@ function limparFormProduto() {
 
 async function loadProdutos() {
     try {
-        const res = await fetch(`${API_BASE}/produtos`, { 
+        const res = await fetch(`${API_BASE}/produtos?por_pagina=200`, { 
             headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
         });
         if (res.status === 401 || res.status === 403) { logout(); return; }
