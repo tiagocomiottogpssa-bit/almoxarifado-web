@@ -338,7 +338,9 @@ th, td {
             <div style="display: flex; gap: 16px;">
     <div class="form-group" style="flex: 2;">
         <label for="produto_id">Produto</label>
-        <select id="produto_id" name="produto_id" required>
+        <input type="text" id="produto_busca" placeholder="Digite para buscar produto..." autocomplete="off"
+            oninput="buscarProdutoAutocomplete(this.value, 'produto_id', 'produto_busca')">
+        <select id="produto_id" name="produto_id" required style="display:none;">
             <option value="">Selecione um produto</option>
         </select>
     </div>
@@ -617,7 +619,9 @@ th, td {
                 <div style="display: flex; gap: 16px;">
                     <div class="form-group" style="flex: 2;">
                         <label>Produto <span style="color: #ef4444;">*</span></label>
-                        <select id="unidade_produto_id">
+                        <input type="text" id="unidade_produto_busca" placeholder="Digite para buscar produto..." autocomplete="off"
+                            oninput="buscarProdutoAutocomplete(this.value, 'unidade_produto_id', 'unidade_produto_busca')">
+                        <select id="unidade_produto_id" style="display:none;">
                             <option value="">Selecione um produto</option>
                         </select>
                     </div>
@@ -3451,6 +3455,65 @@ async function loadProdutos() {
         showMessage('produtos-lista-message', 'Erro ao carregar produtos: ' + err.message, 'error');
     }
 }
+
+let produtoBuscaTimer = null;
+
+function buscarProdutoAutocomplete(texto, selectId, inputId) {
+    clearTimeout(produtoBuscaTimer);
+    const input = document.getElementById(inputId);
+    
+    // Remove sugestões antigas
+    const sugestoes = document.getElementById(inputId + '_sugestoes');
+    if (sugestoes) sugestoes.remove();
+    
+    if (!texto || texto.trim().length < 2) {
+        return;
+    }
+    
+    produtoBuscaTimer = setTimeout(() => {
+        fetch(`${API_BASE}/produtos?busca=${encodeURIComponent(texto)}&por_pagina=20`, {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+        })
+        .then(res => res.json())
+        .then(data => {
+            const produtos = (data.data && data.data.items) || data.data || data || [];
+            if (produtos.length === 0) return;
+            
+            // Cria a lista de sugestões
+            const lista = document.createElement('div');
+            lista.id = inputId + '_sugestoes';
+            lista.style.cssText = 'position:absolute;z-index:1000;background:white;border:1px solid #ccc;max-height:200px;overflow-y:auto;width:100%;';
+            
+            produtos.forEach(p => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding:8px;cursor:pointer;border-bottom:1px solid #eee;';
+                item.textContent = p.nome + (p.codigo_interno ? ' (' + p.codigo_interno + ')' : '');
+                item.onclick = function() {
+                    // Preenche o select oculto com o valor
+                    document.getElementById(selectId).value = p.id;
+                    // Mostra o nome no campo de busca
+                    input.value = p.nome;
+                    // Remove as sugestões
+                    lista.remove();
+                    // Dispara o evento change do select (para preencher código interno, etc.)
+                    document.getElementById(selectId).dispatchEvent(new Event('change'));
+                };
+                lista.appendChild(item);
+            });
+            
+            // Posiciona a lista abaixo do input
+            input.parentNode.style.position = 'relative';
+            input.parentNode.appendChild(lista);
+        });
+    }, 300);
+}
+
+// Fecha as sugestões ao clicar fora
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('[id$="_busca"]')) {
+        document.querySelectorAll('[id$="_sugestoes"]').forEach(s => s.remove());
+    }
+});
 
 
 function loadProdutosSelect() {
