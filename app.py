@@ -352,6 +352,7 @@ def listar_produtos():
     try:
         pagina = request.args.get('pagina', 1, type=int)
         por_pagina = request.args.get('por_pagina', 50, type=int)
+        busca = request.args.get('busca', '').strip()
         if pagina < 1:
             pagina = 1
         if por_pagina < 1 or por_pagina > 200:
@@ -359,17 +360,33 @@ def listar_produtos():
         offset = (pagina - 1) * por_pagina
 
         with get_connection() as conn:
-            # Pega TODOS os ids (só para contar) — ou usa len() se retornar lista
-            rows = conn.execute("""
+            where = ''
+            params = []
+            if busca:
+                where = "WHERE p.nome LIKE ? OR p.codigo_interno LIKE ? OR p.codigo_fabricante LIKE ?"
+                like = f'%{busca}%'
+                params = [like, like, like]
+
+            sql_count = "SELECT COUNT(*) FROM produtos p " + where
+            if params:
+                total = conn.execute(sql_count, params).fetchone()[0]
+            else:
+                total = conn.execute(sql_count).fetchone()[0]
+
+            # ORDER BY SIMPLES (sem subqueries pesadas)
+            sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
+            """ + where + f"""
                 ORDER BY p.nome
-            """).fetchall()
-            total = len(rows)   # ← conta no Python, evita o fetchone()[0]
-            # Pagina manualmente no Python
-            pagina_rows = rows[offset:offset + por_pagina]
+                LIMIT {por_pagina} OFFSET {offset}
+            """
+            if params:
+                rows = conn.execute(sql, params).fetchall()
+            else:
+                rows = conn.execute(sql).fetchall()
 
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
