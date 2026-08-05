@@ -359,10 +359,10 @@ def listar_produtos():
         offset = (pagina - 1) * por_pagina
 
         with get_connection() as conn:
-            # COUNT total — SEM params, SEM where (paginação pura)
+            # COUNT total — SQL mais simples possível, SEM params, SEM where
             total = conn.execute("SELECT COUNT(*) FROM produtos").fetchone()[0]
 
-            # Página atual — SEM where, SEM params, LIMIT/OFFSET embutidos
+            # Página atual — SQL mais simples, SEM params, SEM where, SEM ORDER BY complexo
             sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
