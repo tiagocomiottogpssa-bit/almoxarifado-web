@@ -361,11 +361,24 @@ def listar_produtos():
 
         with get_connection() as conn:
             where = ''
-            params = []
             if busca:
-                where = "WHERE p.nome LIKE ? OR p.codigo_interno LIKE ? OR p.codigo_fabricante LIKE ?"
-                like = f'%{busca}%'
-                params = [like, like, like]
+                # Escapa aspas simples para evitar injeção
+                b = busca.replace("'", "''")
+                where = f"WHERE p.nome LIKE '%{b}%' OR p.codigo_interno LIKE '%{b}%' OR p.codigo_fabricante LIKE '%{b}%'"
+
+            sql_count = "SELECT COUNT(*) FROM produtos p " + where
+            total = conn.execute(sql_count).fetchone()[0]
+
+            sql = """
+                SELECT p.*, a.nome as almoxarifado_nome,
+                    COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
+                FROM produtos p
+                LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
+            """ + where + f"""
+                ORDER BY p.nome
+                LIMIT {por_pagina} OFFSET {offset}
+            """
+            rows = conn.execute(sql).fetchall()
 
             # COUNT total — SEMPRE passa params (mesmo vazio)
             sql_count = "SELECT COUNT(*) FROM produtos p " + where
