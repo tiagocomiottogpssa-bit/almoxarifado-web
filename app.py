@@ -362,7 +362,6 @@ def listar_produtos():
         with get_connection() as conn:
             where = ''
             if busca:
-                # Escapa aspas simples para evitar injeção
                 b = busca.replace("'", "''")
                 where = f"WHERE p.nome LIKE '%{b}%' OR p.codigo_interno LIKE '%{b}%' OR p.codigo_fabricante LIKE '%{b}%'"
 
@@ -379,22 +378,6 @@ def listar_produtos():
                 LIMIT {por_pagina} OFFSET {offset}
             """
             rows = conn.execute(sql).fetchall()
-
-            # COUNT total — SEMPRE passa params (mesmo vazio)
-            sql_count = "SELECT COUNT(*) FROM produtos p " + where
-            total = conn.execute(sql_count, params).fetchone()[0]
-
-            # Página atual — LIMIT/OFFSET embutidos, SEMPRE passa params
-            sql = """
-                SELECT p.*, a.nome as almoxarifado_nome,
-                    COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
-                FROM produtos p
-                LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
-            """ + where + f"""
-                ORDER BY p.nome
-                LIMIT {por_pagina} OFFSET {offset}
-            """
-            rows = conn.execute(sql, params).fetchall()
 
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
