@@ -1308,12 +1308,14 @@ th, td {
             <div style="grid-column:span 2;border:1px solid #e0e0e0;border-radius:6px;padding:12px;background:#fafafa;">
                 <h4 style="margin:0 0 8px 0;">Itens do Pedido</h4>
                 <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
-                    <div style="flex:2;min-width:180px;">
-                        <label>Produto *</label>
-                        <select id="item_produto">
-                            <option value="">Selecione...</option>
-                        </select>
-                    </div>
+                    <div style="flex:2;min-width:180px;position:relative;">
+                    <label>Produto *</label>
+                    <input type="text" id="item_produto_busca" placeholder="Digite para buscar produto..." autocomplete="off"
+                        oninput="buscarProdutoAutocomplete(this.value, 'item_produto', 'item_produto_busca')">
+                    <select id="item_produto" style="display:none;">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
                     <div style="flex:1;min-width:80px;">
                         <label>Qtd *</label>
                         <input type="number" id="item_qtd" min="1">
@@ -3497,6 +3499,16 @@ function buscarProdutoAutocomplete(texto, selectId, inputId) {
                     lista.remove();
                     // Dispara o evento change do select (para preencher código interno, etc.)
                     document.getElementById(selectId).dispatchEvent(new Event('change'));
+                    // ✅ NOVO: Auto-preenche o preço (para a aba Pedidos)
+                    if (selectId === 'item_produto') {
+                        const campoPreco = document.getElementById('item_preco');
+                        if (campoPreco) {
+                            if (p.custo_medio != null && p.custo_medio > 0) campoPreco.value = p.custo_medio;
+                            else if (p.preco != null && p.preco > 0) campoPreco.value = p.preco;
+                            else if (p.valor_unitario != null && p.valor_unitario > 0) campoPreco.value = p.valor_unitario;
+                            else campoPreco.value = '';
+                        }
+                    }
                 };
                 lista.appendChild(item);
             });
@@ -5145,7 +5157,7 @@ async function loadPedidos(statusFiltro) {
 
 async function carregarProdutosParaPedido() {
     try {
-        const res = await fetch(API_BASE + '/produtos?por_pagina=200', { headers: authHeaders() });
+        const res = await fetch(API_BASE + '/produtos?por_pagina=50', { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
         const data = await res.json();
         const produtos = (data.data && data.data.items) || data.data || data || [];
