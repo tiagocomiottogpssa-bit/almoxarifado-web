@@ -1900,7 +1900,7 @@ async function carregarDashboard() {
         const movimentacoes = await resMov.json();
 
         // 2. Busca produtos (para tipo/categoria)
-        const resProd = await fetch(`${API_BASE}/produtos`, { headers });
+        const resProd = await fetch(`${API_BASE}/produtos?por_pagina=200`, { headers });
         const produtos = await resProd.json();
         const prodMap = {};
         const listaProdutos = (produtos.data && produtos.data.items) || produtos.data || produtos || [];
@@ -3443,7 +3443,7 @@ async function loadProdutos() {
 
 
 function loadProdutosSelect() {
-    fetch(`${API_BASE}/produtos`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }})
+    fetch(`${API_BASE}/produtos?por_pagina=200`, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') } })
         .then(res => res.json())
         .then(data => {
             const select = document.getElementById('produto_id');
@@ -3491,8 +3491,8 @@ function loadProdutosSelectUnidades() {
         return;
     }
     
-    fetch(`${API_BASE}/produtos`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    fetch(`${API_BASE}/produtos?por_pagina=200`, {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
     })
     .then(res => res.json())
     .then(data => {
@@ -5071,7 +5071,7 @@ async function loadPedidos(statusFiltro) {
 
 async function carregarProdutosParaPedido() {
     try {
-        const res = await fetch(API_BASE + '/produtos', { headers: authHeaders() });
+        const res = await fetch(API_BASE + '/produtos?por_pagina=200', { headers: authHeaders() });
         if (res.status === 401 || res.status === 403) { logout(); return; }
         const data = await res.json();
         const produtos = (data.data && data.data.items) || data.data || data || [];
