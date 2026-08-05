@@ -360,7 +360,7 @@ def listar_produtos():
         offset = (pagina - 1) * por_pagina
 
         with get_connection() as conn:
-            # Monta o WHERE e os params de forma segura
+            # Monta WHERE e params (só quando há busca)
             where = ''
             params = []
             if busca:
@@ -368,17 +368,20 @@ def listar_produtos():
                 like = f'%{busca}%'
                 params = [like, like, like]
 
-            # COUNT total
+            # COUNT total (params só se houver busca)
             sql_count = "SELECT COUNT(*) FROM produtos p " + where
-            total = conn.execute(sql_count, params).fetchone()[0]
+            if params:
+                total = conn.execute(sql_count, params).fetchone()[0]
+            else:
+                total = conn.execute(sql_count).fetchone()[0]
 
-            # Página atual
+            # Página atual — LIMIT/OFFSET EMBUTIDOS (inteiros validados)
             sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
-            """ + where + """
+            """ + where + f"""
                 ORDER BY
                     CASE
                         WHEN COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) <= 0 THEN 0
@@ -386,9 +389,12 @@ def listar_produtos():
                         ELSE 2
                     END,
                     p.nome
-                LIMIT ? OFFSET ?
+                LIMIT {por_pagina} OFFSET {offset}
             """
-            rows = conn.execute(sql, params + [por_pagina, offset]).fetchall()
+            if params:
+                rows = conn.execute(sql, params).fetchall()
+            else:
+                rows = conn.execute(sql).fetchall()
 
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
