@@ -363,28 +363,29 @@ def listar_produtos():
             where = ''
             if busca:
                 b = busca.replace("'", "''")
-                # ILIKE = ignora maiúsculas/minúsculas
-                # unaccent = ignora acentos
                 where = f"""WHERE unaccent(p.nome) ILIKE unaccent('%{b}%')
                     OR unaccent(p.codigo_interno) ILIKE unaccent('%{b}%')
                     OR unaccent(p.codigo_fabricante) ILIKE unaccent('%{b}%')"""
 
+            # COUNT total — retorna só o número
+            sql_count = "SELECT COUNT(*) FROM produtos p " + where
+            total = conn.execute(sql_count).fetchone()[0]
+
+            # Página atual — LIMIT/OFFSET no SQL (retorna só 50)
             sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
-            """ + where + """
+            """ + where + f"""
                 ORDER BY p.nome
+                LIMIT {por_pagina} OFFSET {offset}
             """
             rows = conn.execute(sql).fetchall()
 
-            total = len(rows)
-            pagina_rows = rows[offset:offset + por_pagina]
-
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
-            'items': rows_to_dict(pagina_rows),
+            'items': rows_to_dict(rows),
             'total': total,
             'pagina': pagina,
             'por_pagina': por_pagina,
