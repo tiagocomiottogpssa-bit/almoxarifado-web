@@ -367,9 +367,10 @@ def listar_produtos():
                     OR unaccent(p.codigo_interno) ILIKE unaccent('%{b}%')
                     OR unaccent(p.codigo_fabricante) ILIKE unaccent('%{b}%')"""
 
-            # COUNT total — retorna só o número
-            sql_count = "SELECT COUNT(*) FROM produtos p " + where
-            total = conn.execute(sql_count).fetchone()[0]
+            # Conta o total carregando SÓ os IDs (leve, sem fetchone()[0])
+            sql_ids = "SELECT p.id FROM produtos p " + where
+            ids = conn.execute(sql_ids).fetchall()
+            total = len(ids)
 
             # Página atual — LIMIT/OFFSET no SQL (retorna só 50)
             sql = """
