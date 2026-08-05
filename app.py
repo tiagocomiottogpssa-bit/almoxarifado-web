@@ -352,7 +352,6 @@ def listar_produtos():
     try:
         pagina = request.args.get('pagina', 1, type=int)
         por_pagina = request.args.get('por_pagina', 50, type=int)
-        busca = request.args.get('busca', '').strip()
         if pagina < 1:
             pagina = 1
         if por_pagina < 1 or por_pagina > 200:
@@ -360,41 +359,19 @@ def listar_produtos():
         offset = (pagina - 1) * por_pagina
 
         with get_connection() as conn:
-            # Monta WHERE e params (só quando há busca)
-            where = ''
-            params = []
-            if busca:
-                where = "WHERE p.nome LIKE ? OR p.codigo_interno LIKE ? OR p.codigo_fabricante LIKE ?"
-                like = f'%{busca}%'
-                params = [like, like, like]
+            # COUNT total — SEM params, SEM where (paginação pura)
+            total = conn.execute("SELECT COUNT(*) FROM produtos").fetchone()[0]
 
-            # COUNT total — SEM placeholder quando não há busca
-            sql_count = "SELECT COUNT(*) FROM produtos p " + where
-            if params:
-                total = conn.execute(sql_count, params).fetchone()[0]
-            else:
-                total = conn.execute(sql_count).fetchone()[0]
-
-            # Página atual — LIMIT/OFFSET EMBUTIDOS (inteiros validados, sem placeholder)
+            # Página atual — SEM where, SEM params, LIMIT/OFFSET embutidos
             sql = """
                 SELECT p.*, a.nome as almoxarifado_nome,
                     COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) as saldo_total
                 FROM produtos p
                 LEFT JOIN almoxarifados a ON p.almoxarifado_id = a.id
-            """ + where + f"""
-                ORDER BY
-                    CASE
-                        WHEN COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) <= 0 THEN 0
-                        WHEN COALESCE((SELECT SUM(quantidade) FROM estoque WHERE produto_id = p.id), 0) < COALESCE(p.estoque_minimo, 0) THEN 1
-                        ELSE 2
-                    END,
-                    p.nome
+                ORDER BY p.nome
                 LIMIT {por_pagina} OFFSET {offset}
             """
-            if params:
-                rows = conn.execute(sql, params).fetchall()
-            else:
-                rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql).fetchall()
 
         total_paginas = (total + por_pagina - 1) // por_pagina
         return response(True, data={
