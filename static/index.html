@@ -4508,6 +4508,7 @@ function limparFormUnidade() {
     document.getElementById('unidade_serie').value = '';
     document.getElementById('unidade_localizacao').value = '';
     document.getElementById('unidade_produto_id').value = '';
+    document.getElementById('unidade_produto_busca').value = ''
     document.querySelector('input[name="unidade_status"][value="disponivel"]').checked = true;
     document.getElementById('unidade_requer_calibracao').checked = false;
     document.getElementById('unidade_data_validade_calibracao').value = '';
@@ -4532,7 +4533,16 @@ function editarUnidade(id) {
         if (!unidade) return alert('Unidade não encontrada.');
 
         document.getElementById('unidadeId').value = unidade.id;
-        document.getElementById('unidade_produto_id').value = unidade.produto_id;
+        // ✅ CORRIGIDO: preenche o select oculto E o campo de busca com o nome do produto
+    const produtoNome = unidade.produto_nome
+    || (window.produtosDataMap && window.produtosDataMap[unidade.produto_id]
+        ? window.produtosDataMap[unidade.produto_id].nome
+        : '');
+    setProdutoSelecionado('unidade_produto_id', 'unidade_produto_busca', {
+    id: unidade.produto_id,
+    nome: produtoNome,
+    codigo_interno: unidade.produto_codigo_interno || ''
+    });
         document.getElementById('unidade_tag').value = unidade.tag || '';
         document.getElementById('unidade_serie').value = unidade.numero_serie || '';
         document.getElementById('unidade_localizacao').value = unidade.localizacao || '';
