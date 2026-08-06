@@ -4561,7 +4561,8 @@ function editarUnidade(id) {
         if (radio) radio.checked = true;
 
         // Rola a tela para o formulário
-        document.querySelector('#subtab-unidades .card').scrollIntoView({ behavior: 'smooth' });
+        const cardUnidade = document.querySelector('#subtab-unidades .card');
+        if (cardUnidade) cardUnidade.scrollIntoView({ behavior: 'smooth' });
     });
 }
 
@@ -4618,18 +4619,19 @@ document.addEventListener('change', function(e) {
 // Carrega colaboradores
 function loadColaboradoresDropdown() {
     fetch(`${API_BASE}/colaboradores`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
     })
     .then(res => res.json())
     .then(data => {
         const select = document.getElementById('emprestimo_colaborador_id');
-        const cols = data.data || [];
+        // ✅ CORREÇÃO: extração defensiva (cobre data.items / data.data / data direto)
+        const cols = (data.data && data.data.items) || data.data || data || [];
         select.innerHTML = '<option value="">Selecione um colaborador</option>';
         cols.forEach(c => {
             select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
         });
     })
-        .catch(err => console.error('Erro ao carregar colaboradores dropdown:', err));
+    .catch(err => console.error('Erro ao carregar colaboradores dropdown:', err));
 }
 
 // Emprestar unidade
