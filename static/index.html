@@ -852,11 +852,12 @@ th, td {
                                 <th style="width:130px; min-width:130px;">Colaborador</th>
                                 <th style="width:85px; min-width:85px;">Data</th>
                                 <th style="width:70px; min-width:70px;">Status</th>
+                                <th style="width:70px; min-width:70px; text-align:center;">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="tabela-emprestimos-body">
                             <tr>
-                                <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">
+                                <td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">
                                     Nenhum empréstimo registrado.
                                 </td>
                             </tr>
@@ -4756,9 +4757,9 @@ function renderTabelaEmprestimos(lista) {
             <td>${e.colaborador_nome || '-'}</td>
             <td>${e.data_emprestimo ? new Date(e.data_emprestimo).toLocaleDateString('pt-BR') : '-'}</td>
             <td>${renderStatusEmprestimo(e.status)}</td>
-            <td style="text-align: center; white-space: nowrap; width: 90px;">
+            <td style="text-align:center; white-space:nowrap; width:70px;">
                 ${e.status === 'ativo'
-                    ? `<button class="btn-sm btn-primary" style="padding: 2px 8px; font-size: 12px;" onclick="devolverRapido(${e.unidade_id})" title="Devolver unidade">📥 Devolver</button>`
+                    ? `<button class="btn-sm btn-primary" style="padding:2px 8px; font-size:12px; line-height:1.4;" onclick="devolverRapido(${e.unidade_id})" title="Devolver unidade">📥 Devolver</button>`
                     : '<span style="color:#9ca3af;">—</span>'}
             </td>
         </tr>
