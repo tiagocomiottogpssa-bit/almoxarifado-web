@@ -4743,7 +4743,7 @@ function renderTabelaEmprestimos(lista) {
     if (!tbody) return;
     if (!lista || lista.length === 0) {
         tbody.innerHTML = `<tr>
-            <td colspan="5" style="text-align: center; color: #9ca3af; padding: 24px;">
+            <td colspan="6" style="text-align: center; color: #9ca3af; padding: 24px;">
                 Nenhum empréstimo encontrado com os filtros atuais.
             </td>
         </tr>`;
@@ -4756,8 +4756,40 @@ function renderTabelaEmprestimos(lista) {
             <td>${e.colaborador_nome || '-'}</td>
             <td>${e.data_emprestimo ? new Date(e.data_emprestimo).toLocaleDateString('pt-BR') : '-'}</td>
             <td>${renderStatusEmprestimo(e.status)}</td>
+            <td style="text-align: center;">
+                ${e.status === 'ativo'
+                    ? `<button class="btn-sm btn-primary" onclick="devolverRapido(${e.unidade_id})" title="Devolver unidade">📥 Devolver</button>`
+                    : '<span style="color:#9ca3af;">—</span>'}
+            </td>
         </tr>
     `).join('');
+}
+
+// Devolução rápida direto da lista de empréstimos
+function devolverRapido(unidade_id) {
+    if (!unidade_id) { alert('Unidade não identificada.'); return; }
+    if (!confirm('Confirmar a devolução desta unidade?')) return;
+
+    const token = localStorage.getItem('access_token');
+    fetch(`${API_BASE}/emprestimos/devolver`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({ unidade_id: unidade_id, com_defeito: false })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('Unidade devolvida com sucesso!');
+            loadEmprestimos();          // recarrega a lista
+            loadUnidadesSelectEmprestimo(); // atualiza o select de unidades
+        } else {
+            alert('Erro: ' + (data.message || 'Erro ao devolver unidade'));
+        }
+    })
+    .catch(err => alert('Erro ao devolver unidade: ' + err.message));
 }
 
 // Atualiza o resumo com a contagem do que está em aberto
