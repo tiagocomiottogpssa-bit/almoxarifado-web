@@ -4756,9 +4756,9 @@ function renderTabelaEmprestimos(lista) {
             <td>${e.colaborador_nome || '-'}</td>
             <td>${e.data_emprestimo ? new Date(e.data_emprestimo).toLocaleDateString('pt-BR') : '-'}</td>
             <td>${renderStatusEmprestimo(e.status)}</td>
-            <td style="text-align: center;">
+            <td style="text-align: center; white-space: nowrap; width: 90px;">
                 ${e.status === 'ativo'
-                    ? `<button class="btn-sm btn-primary" onclick="devolverRapido(${e.unidade_id})" title="Devolver unidade">📥 Devolver</button>`
+                    ? `<button class="btn-sm btn-primary" style="padding: 2px 8px; font-size: 12px;" onclick="devolverRapido(${e.unidade_id})" title="Devolver unidade">📥 Devolver</button>`
                     : '<span style="color:#9ca3af;">—</span>'}
             </td>
         </tr>
