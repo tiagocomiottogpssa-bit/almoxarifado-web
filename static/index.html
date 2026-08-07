@@ -4619,12 +4619,15 @@ document.addEventListener('change', function(e) {
 // Carrega colaboradores
 function loadColaboradoresDropdown() {
     fetch(`${API_BASE}/colaboradores`, {
-        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('access_token') }
+        headers: authHeaders()
     })
-    .then(res => res.json())
+    .then(res => {
+        if (res.status === 401 || res.status === 403) { logout(); return; }
+        return res.json();
+    })
     .then(data => {
+        if (!data) return;
         const select = document.getElementById('emprestimo_colaborador_id');
-        // ✅ CORREÇÃO: extração defensiva (cobre data.items / data.data / data direto)
         const cols = (data.data && data.data.items) || data.data || data || [];
         select.innerHTML = '<option value="">Selecione um colaborador</option>';
         cols.forEach(c => {
