@@ -895,7 +895,6 @@ def etiqueta_colaborador(id):
     <div class="etiqueta">
         <img src="/colaboradores/{id}/codigo-barras" alt="Matrícula">
         <div class="nome">{escape(nome)}</div>
-        <div class="info">Mat: {escape(matricula)}</div>
         <div class="info">{escape(setor)}</div>
         <div class="cargo">{escape(cargo)}</div>
     </div>
@@ -1354,11 +1353,9 @@ def etiquetas_unidades_lote():
         status = u['status'] or ''
         etiquetas_html += f'''
         <div class="etiqueta">
-            <img src="/unidades/{u['id']}/codigo-barras" alt="Código">
-            <div class="tag">{escape(tag)}</div>
-            <div class="produto">{escape(produto)}</div>
-            <div class="info">Série: {escape(serie)}</div>
-            <div class="status">{escape(status)}</div>
+            <img src="/unidades/{u['id']}/codigo-barras" alt="Código de Barras">
+            <div class="produto">{u['produto_nome']}</div>
+            <div class="status">{u['status']}</div>
         </div>'''
 
     html = f'''<!DOCTYPE html>
@@ -3036,7 +3033,6 @@ def etiquetas_lote():
         etiquetas_html += f'''
         <div class="etiqueta">
             <img src="/produtos/{p['id']}/codigo-barras" alt="Código de Barras">
-            <div class="codigo">{escape(codigo)}</div>
             <div class="nome">{escape(nome)}</div>
             <div class="unidade">{escape(unidade)}</div>
         </div>'''
@@ -3071,7 +3067,7 @@ def etiquetas_lote():
     <div class="no-print">
         <button onclick="window.print()">🖨️ Imprimir ({len(produtos)} etiquetas)</button>
         <button onclick="window.close()">✕ Fechar</button>
-        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 6 colunas × 16 linhas · {len(produtos)} etiqueta(s)</p>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 4 colunas × 10 linhas · {len(produtos)} etiqueta(s)</p>
     </div>
     <div class="page">
         <div class="grid">
