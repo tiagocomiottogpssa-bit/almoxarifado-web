@@ -968,7 +968,7 @@ def etiquetas_colaboradores_lote():
     <div class="no-print">
         <button onclick="window.print()">🖨️ Imprimir ({len(colaboradores)} etiquetas)</button>
         <button onclick="window.close()">✕ Fechar</button>
-        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 6 colunas × 16 linhas · {len(colaboradores)} etiqueta(s)</p>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 4 colunas × 10 linhas · {len(colaboradores)} etiqueta(s)</p>
     </div>
     <div class="page"><div class="grid">{etiquetas_html}</div></div>
 </body></html>'''
@@ -1383,7 +1383,7 @@ def etiquetas_unidades_lote():
     <div class="no-print">
         <button onclick="window.print()">🖨️ Imprimir ({len(unidades)} etiquetas)</button>
         <button onclick="window.close()">✕ Fechar</button>
-        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 6 colunas × 16 linhas · {len(unidades)} etiqueta(s)</p>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 4 colunas × 10 linhas · {len(unidades)} etiqueta(s)</p>
     </div>
     <div class="page"><div class="grid">{etiquetas_html}</div></div>
 </body></html>'''
