@@ -415,6 +415,7 @@ def exportar_produtos():
 @app.route('/produtos', methods=['POST'])
 @jwt_required()
 @perfil_required('admin', 'supervisor', 'operador')
+
 def criar_produto():
     data = request.get_json() or {}
     nome = data.get('nome', '').strip()
@@ -426,11 +427,16 @@ def criar_produto():
         'nome', 'codigo_interno', 'codigo_fabricante', 'codigo_barras',
         'descricao', 'categoria', 'tipo', 'unidade', 'preco', 'valor_unitario',
         'estoque_minimo', 'sobressalente', 'rastreabilidade', 'controla_depreciacao',
-        'requer_equipamento', 'equipamentos_compativeis'
+        'requer_equipamento', 'equipamentos_compativeis', 'natureza'
     ]
 
     valores = {campo: data.get(campo) for campo in campos}
     valores['nome'] = nome
+    # Normaliza natureza — só aceita valores conhecidos (evita NULL/inválido)
+    natureza = str(valores.get('natureza') or 'consumivel').strip().lower()
+    if natureza not in ('consumivel', 'ferramenta'):
+        natureza = 'consumivel'
+    valores['natureza'] = natureza
     valores['controla_depreciacao'] = bool(valores.get('controla_depreciacao', 0))
     valores['requer_equipamento'] = bool(valores.get('requer_equipamento', 0))
     valores['created_at'] = now_iso()
@@ -471,7 +477,7 @@ def atualizar_produto(id):
         'nome', 'codigo_interno', 'codigo_fabricante', 'codigo_barras',
         'descricao', 'categoria', 'tipo', 'unidade', 'preco', 'valor_unitario',
         'estoque_minimo', 'sobressalente', 'rastreabilidade', 'controla_depreciacao',
-        'requer_equipamento', 'equipamentos_compativeis'
+        'requer_equipamento', 'equipamentos_compativeis', 'natureza'
     ]
 
     # ✅ Só atualiza os campos que vieram na requisição
@@ -488,6 +494,13 @@ def atualizar_produto(id):
         valores['controla_depreciacao'] = bool(valores['controla_depreciacao'])
     if 'requer_equipamento' in valores:
         valores['requer_equipamento'] = bool(valores['requer_equipamento'])
+
+        # Normaliza natureza se veio na requisição
+    if 'natureza' in valores:
+        natureza = str(valores['natureza'] or '').strip().lower()
+        if natureza not in ('consumivel', 'ferramenta'):
+            natureza = 'consumivel'
+        valores['natureza'] = natureza    
 
     # ✅ Valida nome apenas se foi enviado
     if 'nome' in valores and not valores['nome']:
@@ -618,6 +631,9 @@ def importar_produtos():
                 estoque_minimo = p.get('estoque_minimo', 0)
                 rastreabilidade = p.get('rastreabilidade', '')
                 almoxarifado_id = p.get('almoxarifado_id', None)
+                natureza = str(p.get('natureza', '') or '').strip().lower()
+                if natureza not in ('consumivel', 'ferramenta'):
+                    natureza = 'consumivel'
                 
                 agora = now_iso()
 
@@ -629,14 +645,14 @@ def importar_produtos():
                         UPDATE produtos 
                         SET nome = ?, codigo_interno = ?, codigo_fabricante = ?, codigo_barras = ?,
                             descricao = ?, categoria = ?, tipo = ?, unidade = ?, preco = ?, 
-                            valor_unitario = ?, estoque_minimo = ?, rastreabilidade = ?, 
-                            almoxarifado_id = ?, updated_at = ?
+                            valor_unitario = ?, estoque_minimo = ?, rastreabilidade = ?,
+                            natureza = ?, almoxarifado_id = ?, updated_at = ?
                         WHERE id = ?
                     ''', (
                         nome, codigo_interno, codigo_fabricante, codigo_barras,
                         descricao, categoria, tipo, unidade, preco,
                         valor_unitario, estoque_minimo, rastreabilidade,
-                        almoxarifado_id, agora, produto_id
+                        natureza, almoxarifado_id, agora, produto_id
                     ))
                     atualizados += 1
                 else:
@@ -645,12 +661,12 @@ def importar_produtos():
                         INSERT INTO produtos (
                             nome, codigo_interno, codigo_fabricante, codigo_barras,
                             descricao, categoria, tipo, unidade, preco, valor_unitario,
-                            estoque_minimo, rastreabilidade, almoxarifado_id, created_at, updated_at
+                            estoque_minimo, rastreabilidade, natureza, almoxarifado_id, created_at, updated_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
                         nome, codigo_interno, codigo_fabricante, codigo_barras,
                         descricao, categoria, tipo, unidade, preco, valor_unitario,
-                        estoque_minimo, rastreabilidade, almoxarifado_id, agora, agora
+                        estoque_minimo, rastreabilidade, natureza, almoxarifado_id, agora, agora
                     ))
                     importados += 1
                     

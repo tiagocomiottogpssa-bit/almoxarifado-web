@@ -231,7 +231,7 @@ th, td {
         <input type="text" id="codigo_interno" placeholder="Ex: FERR-001">
     </div>
 </div>
-<!-- Linha 2: Estoque Mínimo + Unidade -->
+<!-- Linha 2: Estoque Mínimo + Unidade + Natureza -->
 <div class="form-row">
     <div class="form-group" style="flex: 0.3;">
         <label>Estoque Mínimo</label>
@@ -240,6 +240,14 @@ th, td {
     <div class="form-group" style="flex: 0.3;">
         <label>Unidade</label>
         <input type="text" id="unidade" placeholder="Ex: UN, CX, KG, LT">
+    </div>
+    <div class="form-group" style="flex: 0.4;">
+        <label>Natureza <span style="color: #ef4444;">*</span></label>
+        <select id="natureza" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff;">
+            <option value="consumivel">Consumível</option>
+            <option value="ferramenta">Ferramenta</option>
+        </select>
+        <small style="color: #6b7280; font-size: 12px;">Ferramenta = controlada por unidade/tag</small>
     </div>
 </div>
 <!-- Linha 3: Rastreabilidade + Sobressalente -->
@@ -3278,7 +3286,8 @@ function submitProduto(event) {
         estoque_minimo: document.getElementById('estoque_minimo').value || 0,
         unidade: document.getElementById('unidade').value || '',
         sobressalente: document.getElementById('sobressalente').checked ? 1 : 0,
-        rastreabilidade: document.querySelector('input[name="rastreabilidade"]:checked').value
+        rastreabilidade: document.querySelector('input[name="rastreabilidade"]:checked').value,
+        natureza: document.getElementById('natureza').value
     };
 
     const url = id ? `${API_BASE}/produtos/${id}` : `${API_BASE}/produtos`;
@@ -3414,6 +3423,7 @@ function editarProduto(id) {
             document.getElementById('sobressalente').checked = p.sobressalente == 1 || p.sobressalente === true;
             document.getElementById('estoque_minimo').value = p.estoque_minimo || 0;
             document.getElementById('unidade').value = p.unidade || '';
+            document.getElementById('natureza').value = p.natureza || 'consumivel';
             
             const radios = document.querySelectorAll('input[name="rastreabilidade"]');
             radios.forEach(r => {
@@ -3444,6 +3454,7 @@ function limparFormProduto() {
     document.getElementById('produtoForm').reset();
     document.getElementById('estoque_minimo').value = '0';
     document.getElementById('unidade').value = '';
+    document.getElementById('natureza').value = 'consumivel';
     document.getElementById('sobressalente').checked = false;
     document.querySelector('input[name="rastreabilidade"][value="nenhum"]').checked = true;
     document.getElementById('btnTexto').textContent = 'Salvar Produto';
