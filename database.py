@@ -293,6 +293,13 @@ def init_db():
         _migrate_movimentacoes_checkout(conn)
         _migrate_produtos_sobressalente(conn)
         _migrate_usuarios_trocar_senha(conn)
+        # Migração do perfil na tabela usuarios
+                # (usa verificação em vez de try/except — PostgreSQL aborta transação em erro)
+        if not _column_exists(conn, 'usuarios', 'perfil'):
+            conn.execute(
+                "ALTER TABLE usuarios ADD COLUMN perfil TEXT DEFAULT 'operador' "
+                "CHECK(perfil IN ('admin', 'operador', 'visualizador'))"
+                    )
         _migrate_usuarios_perfil(conn)
         # Migração: adiciona almoxarifado_origem_id se não existir
         if not _column_exists(conn, 'manutencoes_unidades', 'almoxarifado_origem_id'):
@@ -311,13 +318,7 @@ def init_db():
         _migrate_pedidos_compra(conn)
         _migrate_quantidade_transferida(conn)
 
-        # Migração do perfil na tabela usuarios
-        # (usa verificação em vez de try/except — PostgreSQL aborta transação em erro)
-        if not _column_exists(conn, 'usuarios', 'perfil'):
-            conn.execute(
-                "ALTER TABLE usuarios ADD COLUMN perfil TEXT DEFAULT 'operador' "
-                "CHECK(perfil IN ('admin', 'operador', 'visualizador'))"
-            )
+        
 
         # Migração da coluna ativo
         if not _column_exists(conn, 'usuarios', 'ativo'):
