@@ -284,14 +284,15 @@ def init_db():
         _migrate_movimentacoes_extras(conn)
         _migrate_estoque_updated_at(conn)
         _migrate_colaboradores_matricula(conn)
+        # CORRIGIDO: unidades criadas ANTES da migração de empréstimos
+        _create_unidades(conn)
+        _create_manutencoes_unidades(conn)
         _migrate_emprestimos(conn)
         _migrate_colaboradores_codigo_barras(conn)
         _migrate_produtos_natureza(conn)
         _migrate_movimentacoes_checkout(conn)
         _migrate_produtos_sobressalente(conn)
         _migrate_usuarios_trocar_senha(conn)
-        _create_unidades(conn)
-        _create_manutencoes_unidades(conn)
         _migrate_usuarios_perfil(conn)
         # Migração: adiciona almoxarifado_origem_id se não existir
         if not _column_exists(conn, 'manutencoes_unidades', 'almoxarifado_origem_id'):
@@ -299,11 +300,11 @@ def init_db():
         # Migração: atualiza CHECK de status da manutencoes_unidades para incluir aguardando_envio
         if USE_POSTGRES:
             conn.execute("ALTER TABLE manutencoes_unidades DROP CONSTRAINT IF EXISTS manutencoes_unidades_status_check")
-            conn.execute("ALTER TABLE manutencoes_unidades ADD CONSTRAINT manutencoes_unidades_status_check CHECK (status IN ('aguardando_envio', 'em_manutencao', 'concluida'))")    
+            conn.execute("ALTER TABLE manutencoes_unidades ADD CONSTRAINT manutencoes_unidades_status_check CHECK (status IN ('aguardando_envio', 'em_manutencao', 'concluida'))")
         _migrate_unidades_depreciacao(conn)
         _migrate_unidades_preventiva(conn)
         _migrate_produtos_depreciacao(conn)
-        _migrate_produtos_sobressalente(conn) 
+        _migrate_produtos_sobressalente(conn)
         _create_equipamentos(conn)
         _create_pedidos(conn)
         _create_pedidos_itens(conn)
@@ -318,12 +319,12 @@ def init_db():
                 "CHECK(perfil IN ('admin', 'operador', 'visualizador'))"
             )
 
-         # Migração da coluna ativo
+        # Migração da coluna ativo
         if not _column_exists(conn, 'usuarios', 'ativo'):
             conn.execute(
                 "ALTER TABLE usuarios ADD COLUMN ativo BOOLEAN DEFAULT TRUE"
             )
-        
+
         # Migração da coluna email
         if not _column_exists(conn, 'usuarios', 'email'):
             conn.execute(
@@ -342,7 +343,7 @@ def init_db():
             FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
         )''')
         _create_transferencias(conn)
-                # Criar usuário admin padrão se não existir
+        # Criar usuário admin padrão se não existir
         cursor = conn.execute("SELECT COUNT(*) as count FROM usuarios")
         if cursor.fetchone()['count'] == 0:
             from werkzeug.security import generate_password_hash
