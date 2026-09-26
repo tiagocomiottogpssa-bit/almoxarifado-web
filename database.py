@@ -274,6 +274,9 @@ def _migrate_usuarios_trocar_senha(conn):
 def init_db():
     """Cria/atualiza todas as tabelas do banco."""
     with get_connection() as conn:
+        # Garante a extensão unaccent (PostgreSQL) para buscas sem acento
+        if USE_POSTGRES:
+            conn.execute("CREATE EXTENSION IF NOT EXISTS unaccent;")
         _create_usuarios(conn)
         _migrate_almoxarifados(conn)
         _migrate_produtos(conn)
