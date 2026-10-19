@@ -3433,7 +3433,7 @@ def listar_emprestimos():
     try:
         with get_connection() as conn:
             rows = conn.execute('''
-                SELECT ep.*, u.numero_serie, p.nome as produto_nome,
+                SELECT ep.*, u.numero_serie, u.tag, p.nome as produto_nome,
                        c.nome as colaborador_nome
                 FROM emprestimos ep
                 LEFT JOIN unidades u ON ep.unidade_id = u.id
