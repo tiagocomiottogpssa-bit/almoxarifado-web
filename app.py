@@ -968,22 +968,22 @@ def etiquetas_colaboradores_lote():
 <style>
     * {{ margin:0; padding:0; box-sizing:border-box; }}
     body {{ font-family:Arial,Helvetica,sans-serif; background:#ccc; }}
-    .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:8mm 8mm 0 8mm; }}
-    .grid {{ display:grid; grid-template-columns:repeat(4, 44.6mm); grid-template-rows:repeat(10, 21.2mm); gap:0; justify-content:space-between; }}
-    .etiqueta {{ width:44.6mm; height:21.2mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
-    .etiqueta img {{ max-width:38mm; max-height:11mm; margin-bottom:0.8mm; }}
-    .etiqueta .nome {{ font-size:9px; font-weight:bold; text-align:center; line-height:1.2; }}
-    .etiqueta .info {{ font-size:7px; text-align:center; line-height:1.2; color:#333; }}
-    .etiqueta .cargo {{ font-size:7px; text-align:center; line-height:1.2; color:#2563eb; }}
+    .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:15.15mm 9.75mm 0 9.75mm; }}
+    .grid {{ display:grid; grid-template-columns:repeat(3, 63.5mm); grid-template-rows:repeat(7, 38.1mm); gap:0; justify-content:space-between; }}
+    .etiqueta {{ width:63.5mm; height:38.1mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
+    .etiqueta img {{ max-width:55mm; max-height:16mm; margin-bottom:1mm; }}
+    .etiqueta .nome {{ font-size:12px; font-weight:bold; text-align:center; line-height:1.2; }}
+    .etiqueta .info {{ font-size:9px; text-align:center; line-height:1.2; color:#333; }}
+    .etiqueta .cargo {{ font-size:9px; text-align:center; line-height:1.2; color:#2563eb; }}
     .no-print {{ text-align:center; padding:10px 0; }}
     .no-print button {{ padding:10px 24px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; margin:0 4px; }}
-    @media print {{ @page {{ size:A4; margin:0; }} body {{ background:#fff; }} .page {{ width:100%; padding:8mm 8mm 0 8mm; }} .no-print {{ display:none; }} .etiqueta {{ border:0.2mm solid #000; }} }}
+    @media print {{ @page {{ size:A4; margin:0; }} body {{ background:#fff; }} .page {{ width:100%; padding:15.15mm 9.75mm 0 9.75mm; }} .no-print {{ display:none; }} .etiqueta {{ border:0.2mm solid #000; }} }}
 </style></head>
 <body>
     <div class="no-print">
         <button onclick="window.print()">🖨️ Imprimir ({len(colaboradores)} etiquetas)</button>
         <button onclick="window.close()">✕ Fechar</button>
-        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 4 colunas × 10 linhas · {len(colaboradores)} etiqueta(s)</p>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 3 colunas × 7 linhas · 63,5 x 38,1 mm · {len(colaboradores)} etiqueta(s)</p>
     </div>
     <div class="page"><div class="grid">{etiquetas_html}</div></div>
 </body></html>'''
@@ -1370,6 +1370,7 @@ def etiquetas_unidades_lote():
         etiquetas_html += f'''
         <div class="etiqueta">
             <img src="/unidades/{u['id']}/codigo-barras" alt="Código de Barras">
+            <div class="tag">{escape(tag)}</div>
             <div class="produto">{u['produto_nome']}</div>
             <div class="status">{u['status']}</div>
         </div>'''
@@ -1380,23 +1381,23 @@ def etiquetas_unidades_lote():
 <style>
     * {{ margin:0; padding:0; box-sizing:border-box; }}
     body {{ font-family:Arial,Helvetica,sans-serif; background:#ccc; }}
-    .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:8mm 8mm 0 8mm; }}
-    .grid {{ display:grid; grid-template-columns:repeat(4, 44.6mm); grid-template-rows:repeat(10, 21.2mm); gap:0; justify-content:space-between; }}
-    .etiqueta {{ width:44.6mm; height:21.2mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
-    .etiqueta img {{ max-width:38mm; max-height:11mm; margin-bottom:0.8mm; }}
-    .etiqueta .tag {{ font-size:11px; font-weight:bold; text-align:center; line-height:1.2; }}
-    .etiqueta .produto {{ font-size:8px; text-align:center; line-height:1.2; color:#333; }}
-    .etiqueta .status {{ font-size:7px; text-align:center; line-height:1.2; color:#2563eb; font-weight:bold; }}
+    .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:15.15mm 9.75mm 0 9.75mm; }}
+    .grid {{ display:grid; grid-template-columns:repeat(3, 63.5mm); grid-template-rows:repeat(7, 38.1mm); gap:0; justify-content:space-between; }}
+    .etiqueta {{ width:63.5mm; height:38.1mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
+    .etiqueta img {{ max-width:55mm; max-height:16mm; margin-bottom:1mm; }}
+    .etiqueta .tag {{ font-size:14px; font-weight:bold; text-align:center; line-height:1.2; }}
+    .etiqueta .produto {{ font-size:10px; text-align:center; line-height:1.2; color:#333; }}
+    .etiqueta .status {{ font-size:9px; text-align:center; line-height:1.2; color:#2563eb; font-weight:bold; }}
     .etiqueta .info {{ display:none; }}
     .no-print {{ text-align:center; padding:10px 0; }}
     .no-print button {{ padding:10px 24px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; margin:0 4px; }}
-    @media print {{ @page {{ size:A4; margin:0; }} body {{ background:#fff; }} .page {{ width:100%; padding:8mm 8mm 0 8mm; }} .no-print {{ display:none; }} .etiqueta {{ border:0.2mm solid #000; }} }}
+    @media print {{ @page {{ size:A4; margin:0; }} body {{ background:#fff; }} .page {{ width:100%; padding:15.15mm 9.75mm 0 9.75mm; }} .no-print {{ display:none; }} .etiqueta {{ border:0.2mm solid #000; }} }}
 </style></head>
 <body>
     <div class="no-print">
         <button onclick="window.print()">🖨️ Imprimir ({len(unidades)} etiquetas)</button>
         <button onclick="window.close()">✕ Fechar</button>
-        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 4 colunas × 10 linhas · {len(unidades)} etiqueta(s)</p>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 3 colunas × 7 linhas ·63,5 mm x 38,1 mm · {len(unidades)} etiqueta(s)</p>
     </div>
     <div class="page"><div class="grid">{etiquetas_html}</div></div>
 </body></html>'''
@@ -3061,19 +3062,19 @@ def etiquetas_lote():
     <style>
         * {{ margin:0; padding:0; box-sizing:border-box; }}
         body {{ font-family:Arial, Helvetica, sans-serif; background:#ccc; }}
-        .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:8mm 8mm 0 8mm; }}
-        .grid {{ display:grid; grid-template-columns:repeat(4, 44.6mm); grid-template-rows:repeat(10, 21.2mm); gap:0; justify-content:space-between; }}
-        .etiqueta {{ width:44.6mm; height:21.2mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
-        .etiqueta img {{ max-width:38mm; max-height:11mm; margin-bottom:0.8mm; }}
-        .etiqueta .codigo {{ font-size:11px; font-weight:bold; text-align:center; line-height:1.1; }}
-        .etiqueta .nome {{ font-size:8px; text-align:center; line-height:1.2; color:#333; }}
-        .etiqueta .unidade {{ font-size:7px; text-align:center; line-height:1.2; color:#666; }}
+        .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:15.15mm 9.75mm 0 9.75mm; }}
+        .grid {{ display:grid; grid-template-columns:repeat(3, 63.5mm); grid-template-rows:repeat(7, 38.1mm); gap:0; justify-content:space-between; }}
+        .etiqueta {{ width:63.5mm; height:38.1mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
+        .etiqueta img {{ max-width:55mm; max-height:16mm; margin-bottom:1mm; }}
+        .etiqueta .codigo {{ font-size:14px; font-weight:bold; text-align:center; line-height:1.1; }}
+        .etiqueta .nome {{ font-size:10px; text-align:center; line-height:1.2; color:#333; }}
+        .etiqueta .unidade {{ font-size:9px; text-align:center; line-height:1.2; color:#666; }}
         .no-print {{ text-align:center; padding:10px 0; }}
         .no-print button {{ padding:10px 24px; font-size:14px; cursor:pointer; background:#2563eb; color:#fff; border:none; border-radius:6px; margin:0 4px; }}
         @media print {{
             @page {{ size:A4; margin:0; }}
             body {{ background:#fff; }}
-            .page {{ width:100%; min-height:auto; padding:8mm 8mm 0 8mm; box-shadow:none; }}
+            .page {{ width:100%; min-height:auto; padding:15.15mm 9.75mm 0 9.75mm; box-shadow:none; }}
             .no-print {{ display:none; }}
             .etiqueta {{ border:0.2mm solid #000; }}
         }}
@@ -3083,7 +3084,7 @@ def etiquetas_lote():
     <div class="no-print">
         <button onclick="window.print()">🖨️ Imprimir ({len(produtos)} etiquetas)</button>
         <button onclick="window.close()">✕ Fechar</button>
-        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 4 colunas × 10 linhas · {len(produtos)} etiqueta(s)</p>
+        <p style="margin-top:8px;font-size:12px;color:#555;">Formato A4 · 3 colunas × 7 linhas · 63,5 mm x 38,1 mm · {len(produtos)} etiqueta(s)</p>
     </div>
     <div class="page">
         <div class="grid">
