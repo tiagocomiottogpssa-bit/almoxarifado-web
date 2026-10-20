@@ -861,7 +861,7 @@ def gerar_codigo_barras_colaborador(id):
             if not codigo:
                 return response(False, message='Colaborador sem matrícula.', status_code=400)
 
-            codigo = unid['tag'] or unid['numero_serie'] or 'SEMCODIGO'
+            codigo = colab['matricula']
             CODE128 = barcode.get_barcode_class('code128')
             codigo_barras = CODE128(codigo, writer=SVGWriter())
             buf = io.BytesIO()
@@ -3011,7 +3011,7 @@ def gerar_codigo_barras(id):
                 return response(False, message='Produto sem código interno.', status_code=400)
 
             # Gera o código de barras no formato CODE128
-            codigo = unid['tag'] or unid['numero_serie'] or 'SEMCODIGO'
+            codigo = p['codigo_interno']
             CODE128 = barcode.get_barcode_class('code128')
             codigo_barras = CODE128(codigo, writer=SVGWriter())
             buf = io.BytesIO()
