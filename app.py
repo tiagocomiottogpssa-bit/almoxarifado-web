@@ -20,6 +20,7 @@ import tempfile
 import math
 import barcode
 from barcode.writer import ImageWriter
+from barcode.writer import SVGWriter
 import io
 from flask import send_file
 from markupsafe import escape
@@ -860,12 +861,18 @@ def gerar_codigo_barras_colaborador(id):
             if not codigo:
                 return response(False, message='Colaborador sem matrícula.', status_code=400)
 
+            codigo = unid['tag'] or unid['numero_serie'] or 'SEMCODIGO'
             CODE128 = barcode.get_barcode_class('code128')
-            codigo_barras = CODE128(codigo, writer=ImageWriter())
+            codigo_barras = CODE128(codigo, writer=SVGWriter())
             buf = io.BytesIO()
-            codigo_barras.write(buf)
+            codigo_barras.write(buf, options={
+                'module_width': 0.5,    # mm por módulo (default 0.2 — barras 2,5x mais grossas)
+                'module_height': 15.0,
+                'font_size': 10,
+                'text_distance': 4.0,
+            })
             buf.seek(0)
-            return send_file(buf, mimetype='image/png')
+            return send_file(buf, mimetype='image/svg+xml')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
@@ -971,7 +978,7 @@ def etiquetas_colaboradores_lote():
     .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:15.15mm 9.75mm 0 9.75mm; }}
     .grid {{ display:grid; grid-template-columns:repeat(3, 63.5mm); grid-template-rows:repeat(7, 38.1mm); gap:0; justify-content:space-between; }}
     .etiqueta {{ width:63.5mm; height:38.1mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
-    .etiqueta img {{ max-width:55mm; max-height:16mm; margin-bottom:1mm; }}
+    .etiqueta img {{ display:block; width:100%; height:20mm; object-fit:fill; image-rendering:pixelated; margin-bottom:1.5mm; }}
     .etiqueta .nome {{ font-size:12px; font-weight:bold; text-align:center; line-height:1.2; }}
     .etiqueta .info {{ font-size:9px; text-align:center; line-height:1.2; color:#333; }}
     .etiqueta .cargo {{ font-size:9px; text-align:center; line-height:1.2; color:#2563eb; }}
@@ -1269,11 +1276,16 @@ def gerar_codigo_barras_unidade(id):
 
             codigo = unid['tag'] or unid['numero_serie'] or 'SEMCODIGO'
             CODE128 = barcode.get_barcode_class('code128')
-            codigo_barras = CODE128(codigo, writer=ImageWriter())
+            codigo_barras = CODE128(codigo, writer=SVGWriter())
             buf = io.BytesIO()
-            codigo_barras.write(buf)
+            codigo_barras.write(buf, options={
+                'module_width': 0.5,    # mm por módulo (default 0.2 — barras 2,5x mais grossas)
+                'module_height': 15.0,
+                'font_size': 10,
+                'text_distance': 4.0,
+            })
             buf.seek(0)
-            return send_file(buf, mimetype='image/png')
+            return send_file(buf, mimetype='image/svg+xml')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
@@ -1384,7 +1396,7 @@ def etiquetas_unidades_lote():
     .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:15.15mm 9.75mm 0 9.75mm; }}
     .grid {{ display:grid; grid-template-columns:repeat(3, 63.5mm); grid-template-rows:repeat(7, 38.1mm); gap:0; justify-content:space-between; }}
     .etiqueta {{ width:63.5mm; height:38.1mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
-    .etiqueta img {{ max-width:55mm; max-height:16mm; margin-bottom:1mm; }}
+    .etiqueta img {{ display:block; width:100%; height:20mm; object-fit:fill; image-rendering:pixelated; margin-bottom:1.5mm; }}
     .etiqueta .tag {{ font-size:14px; font-weight:bold; text-align:center; line-height:1.2; }}
     .etiqueta .produto {{ font-size:10px; text-align:center; line-height:1.2; color:#333; }}
     .etiqueta .status {{ font-size:9px; text-align:center; line-height:1.2; color:#2563eb; font-weight:bold; }}
@@ -2999,15 +3011,18 @@ def gerar_codigo_barras(id):
                 return response(False, message='Produto sem código interno.', status_code=400)
 
             # Gera o código de barras no formato CODE128
+            codigo = unid['tag'] or unid['numero_serie'] or 'SEMCODIGO'
             CODE128 = barcode.get_barcode_class('code128')
-            codigo_barras = CODE128(codigo, writer=ImageWriter())
-
-            # Salva em memória
+            codigo_barras = CODE128(codigo, writer=SVGWriter())
             buf = io.BytesIO()
-            codigo_barras.write(buf)
+            codigo_barras.write(buf, options={
+                'module_width': 0.5,    # mm por módulo (default 0.2 — barras 2,5x mais grossas)
+                'module_height': 15.0,
+                'font_size': 10,
+                'text_distance': 4.0,
+            })
             buf.seek(0)
-
-            return send_file(buf, mimetype='image/png')
+            return send_file(buf, mimetype='image/svg+xml')
     except Exception as e:
         return response(False, message=str(e), status_code=500)
 
@@ -3065,7 +3080,7 @@ def etiquetas_lote():
         .page {{ width:210mm; min-height:297mm; margin:0 auto; background:#fff; padding:15.15mm 9.75mm 0 9.75mm; }}
         .grid {{ display:grid; grid-template-columns:repeat(3, 63.5mm); grid-template-rows:repeat(7, 38.1mm); gap:0; justify-content:space-between; }}
         .etiqueta {{ width:63.5mm; height:38.1mm; border:0.3mm dashed #999; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1mm; overflow:hidden; }}
-        .etiqueta img {{ max-width:55mm; max-height:16mm; margin-bottom:1mm; }}
+        .etiqueta img {{ display:block; width:100%; height:20mm; object-fit:fill; image-rendering:pixelated; margin-bottom:1.5mm; }}
         .etiqueta .codigo {{ font-size:14px; font-weight:bold; text-align:center; line-height:1.1; }}
         .etiqueta .nome {{ font-size:10px; text-align:center; line-height:1.2; color:#333; }}
         .etiqueta .unidade {{ font-size:9px; text-align:center; line-height:1.2; color:#666; }}
