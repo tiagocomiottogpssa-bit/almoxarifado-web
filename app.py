@@ -3011,7 +3011,7 @@ def gerar_codigo_barras(id):
                 return response(False, message='Produto sem código interno.', status_code=400)
 
             # Gera o código de barras no formato CODE128
-            codigo = p['codigo_interno']
+            codigo = produto['codigo_interno'] or str(id)
             CODE128 = barcode.get_barcode_class('code128')
             codigo_barras = CODE128(codigo, writer=SVGWriter())
             buf = io.BytesIO()
